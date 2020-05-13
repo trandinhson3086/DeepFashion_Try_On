@@ -7,6 +7,7 @@ import json
 import numpy as np
 import os.path as osp
 from PIL import ImageDraw
+import random
 
 class AlignedDataset(BaseDataset):
     def initialize(self, opt):
@@ -74,6 +75,8 @@ class AlignedDataset(BaseDataset):
             dir_A = '_A' if self.opt.label_nc == 0 else '_label'
             self.dir_A = os.path.join(opt.dataroot, opt.phase + dir_A)
             self.A_paths = sorted(make_dataset_test(self.dir_A))
+
+
     def random_sample(self,item):
         name = item.split('/')[-1]
         name = name.split('-')[0]
@@ -98,26 +101,13 @@ class AlignedDataset(BaseDataset):
                         self.diction[name].append(d)
 
 
-    def __getitem__(self, index):        
-        train_mask=9600
-        ### input A (label maps)
-        box=[]
-        # for k,x in enumerate(self.A_paths):
-        #     if '000386' in x :
-        #         index=k
-        #         break
-        test=np.random.randint(2032)
-        # for k, s in enumerate(self.B_paths):
-        #    if '006581' in s:
-        #        test = k
-        #        break
+    def get_item(self, index):
+        test = np.random.randint(2032)
         A_path = self.A_paths[index]
         AR_path = self.AR_paths[index]
         A = Image.open(A_path).convert('L')
         AR = Image.open(AR_path).convert('L')
 
-
-  
         params = get_params(self.opt, A.size)
         if self.opt.label_nc == 0:
             transform_A = get_transform(self.opt, params)
@@ -132,26 +122,25 @@ class AlignedDataset(BaseDataset):
         ### input B (real images)
 
         B_path = self.B_paths[index]
-        name=B_path.split('/')[-1]
-
+        name = B_path.split('/')[-1]
 
         BR_path = self.BR_paths[index]
         B = Image.open(B_path).convert('RGB')
         BR = Image.open(BR_path).convert('RGB')
-        transform_B = get_transform(self.opt, params)      
+        transform_B = get_transform(self.opt, params)
         B_tensor = transform_B(B)
         BR_tensor = transform_B(BR)
 
         ### input M (masks)
-        M_path = B_path#self.M_paths[np.random.randint(1)]
-        MR_path = B_path#self.MR_paths[np.random.randint(1)]
+        M_path = B_path  # self.M_paths[np.random.randint(1)]
+        MR_path = B_path  # self.MR_paths[np.random.randint(1)]
         M = Image.open(M_path).convert('L')
         MR = Image.open(MR_path).convert('L')
         M_tensor = transform_A(MR)
 
         ### input_MC (colorMasks)
-        MC_path = B_path#self.MC_paths[1]
-        MCR_path = B_path#self.MCR_paths[1]
+        MC_path = B_path  # self.MC_paths[1]
+        MCR_path = B_path  # self.MCR_paths[1]
         MCR = Image.open(MCR_path).convert('L')
         MC_tensor = transform_A(MCR)
 
@@ -167,14 +156,13 @@ class AlignedDataset(BaseDataset):
         E = Image.open(E_path).convert('L')
         E_tensor = transform_A(E)
 
-
         ##Pose
-        pose_name =B_path.replace('.jpg', '_keypoints.json').replace('test_img','test_pose')
+        pose_name = B_path.replace('.jpg', '_keypoints.json').replace('test_img', 'test_pose')
         with open(osp.join(pose_name), 'r') as f:
             pose_label = json.load(f)
             pose_data = pose_label['people'][0]['pose_keypoints']
             pose_data = np.array(pose_data)
-            pose_data = pose_data.reshape((-1,3))
+            pose_data = pose_data.reshape((-1, 3))
 
         point_num = pose_data.shape[0]
         pose_map = torch.zeros(point_num, self.fine_height, self.fine_width)
@@ -184,22 +172,35 @@ class AlignedDataset(BaseDataset):
         for i in range(point_num):
             one_map = Image.new('L', (self.fine_width, self.fine_height))
             draw = ImageDraw.Draw(one_map)
-            pointx = pose_data[i,0]
-            pointy = pose_data[i,1]
+            pointx = pose_data[i, 0]
+            pointy = pose_data[i, 1]
             if pointx > 1 and pointy > 1:
-                draw.rectangle((pointx-r, pointy-r, pointx+r, pointy+r), 'white', 'white')
-                pose_draw.rectangle((pointx-r, pointy-r, pointx+r, pointy+r), 'white', 'white')
+                draw.rectangle((pointx - r, pointy - r, pointx + r, pointy + r), 'white', 'white')
+                pose_draw.rectangle((pointx - r, pointy - r, pointx + r, pointy + r), 'white', 'white')
             one_map = transform_B(one_map.convert('RGB'))
             pose_map[i] = one_map[0]
-        P_tensor=pose_map
+        P_tensor = pose_map
         if self.opt.isTrain:
-            input_dict = { 'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor, 'path': A_path, 'path_ref': AR_path,
-                            'edge': E_tensor,'color': C_tensor, 'mask': M_tensor, 'colormask': MC_tensor,'pose':P_tensor,'name':name
+            input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
+                          'path': A_path, 'path_ref': AR_path,
+                          'edge': E_tensor, 'color': C_tensor, 'mask': M_tensor, 'colormask': MC_tensor,
+                          'pose': P_tensor, 'name': name
                           }
         else:
-            input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor, 'path': A_path, 'path_ref': AR_path}
+            input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
+                          'path': A_path, 'path_ref': AR_path}
 
         return input_dict
+
+    def __getitem__(self, index):
+        if self.opt.phase == "test":
+            return self.get_item(index)
+        else:
+            alternative_index = random.choice(range(len(self)))
+            while alternative_index == index:
+                alternative_index = random.choice(range(len(self)))
+            return self.get_item(index), self.get_item(alternative_index)
+
 
     def __len__(self):
         return len(self.A_paths) // self.opt.batchSize * self.opt.batchSize
