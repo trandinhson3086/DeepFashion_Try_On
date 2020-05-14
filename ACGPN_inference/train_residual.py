@@ -31,7 +31,7 @@ SIZE = 320
 NC = 14
 
 lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
-lambdas = {'adv': 0.25, 'identity': 20, 'mse': 50, 'vis_reg': 1, 'consist': 5}
+lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 10}
 
 
 def single_gpu_flag(args):
@@ -193,10 +193,16 @@ if opt.distributed:
 model.apply(weights_init('kaiming'))
 model.cuda()
 
+
 if opt.use_gan:
     discriminator = Discriminator()
     discriminator.apply(utils.weights_init('gaussian'))
     discriminator.cuda()
+
+if not opt.checkpoint == '' and os.path.exists(opt.checkpoint):
+    load_checkpoint(model, opt.checkpoint)
+    if opt.use_gan:
+        load_checkpoint(discriminator, opt.checkpoint.replace("step_", "step_disc_"))
 
 model_module = model
 if opt.use_gan:
@@ -254,15 +260,15 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
                 , Variable(data['color'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
                 Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
 
-            _, transfer_2, prod_image_2, _, _, _, _, _, gt_rgb_2, _ = prev_model(
+            _, transfer_2, prod_image_2, _, _, _, clothes_mask_2, _, gt_rgb_2, _ = prev_model(
                 Variable(data['label'].cuda()), Variable(data['edge2'].cuda()), Variable(img_fore.cuda()),
                 Variable(mask_clothes.cuda())
                 , Variable(data['color2'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
                 Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
 
+            consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
-        gt_residual = (torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1) / 2
-
+        gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1) / 2) * consistent_mask
         output_1 = model(torch.cat([transfer_1, gt_residual.detach()], dim=1))
         output_2 = model(torch.cat([transfer_2, gt_residual.detach()], dim=1))
 
@@ -344,11 +350,11 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
 
         if single_gpu_flag(opt):
 
-            if (step + 1) % 100 == 0:
-                visuals = [[seg_label_1.cpu(), prod_1_mask.cpu(), data['image']],
+            if (step + 1) % opt.display_freq == 0:
+                visuals = [[prod_1_mask.cpu(), torch.cat([clothes_mask_2, clothes_mask_2, clothes_mask_2], 1).cpu(),  data['image']],
                            [data['color'], data['color2'], torch.cat([gt_residual, gt_residual, gt_residual], dim=1)],
-                           [transfer_1, output_1, (transfer_1 - output_1) / 2],
-                           [transfer_2, output_2, (transfer_2 - output_2) / 2]]
+                           [transfer_1, output_1, (output_1 - transfer_1) / 2],
+                           [transfer_2, output_2, (output_2 - transfer_2) / 2]]
                 # combine=c[0].squeeze()
                 # cv_img = (combine.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2
                 # if step % 1 == 0:

@@ -40,6 +40,7 @@ class BaseOptions():
         self.parser.add_argument('--tf_log', action='store_true', help='if specified, use tensorboard logging. Requires tensorflow installed')
 
         self.parser.add_argument('--use_gan', action='store_true', help='if specified, use tensorboard logging. Requires tensorflow installed')
+        self.parser.add_argument('--checkpoint', type=str, default='')
 
 
         # for generator
