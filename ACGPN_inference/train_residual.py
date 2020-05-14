@@ -71,7 +71,7 @@ def changearm(old_label):
     label = label * (1 - noise) + noise * 4
     return label
 
-tmp_img_dir = 'sample_tr/'
+tmp_img_dir = 'sample_tr2/'
 os.makedirs(tmp_img_dir, exist_ok=True)
 opt = TrainOptions().parse()
 iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
@@ -110,54 +110,44 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
     epoch_start_time = time.time()
     if epoch != start_epoch:
         epoch_iter = epoch_iter % dataset_size
-    for i, data in enumerate(dataset, start=epoch_iter):
+    for i, (data, data2) in enumerate(dataset, start=epoch_iter):
 
         iter_start_time = time.time()
         total_steps += opt.batchSize
         epoch_iter += opt.batchSize
 
-        # whether to collect output images
-        # save_fake = total_steps % opt.display_freq == display_delta
-        save_fake = True
-
-        ##add gaussian noise channel
-        ## wash the label
-        t_mask = torch.FloatTensor((data['label'].cpu().numpy() == 7).astype(np.float))
-        #
-        # data['label'] = data['label'] * (1 - t_mask) + t_mask * 4
-        mask_clothes = torch.FloatTensor((data['label'].cpu().numpy() == 4).astype(np.int))
-        mask_fore = torch.FloatTensor((data['label'].cpu().numpy() > 0).astype(np.int))
-        img_fore = data['image'] * mask_fore
-        img_fore_wc = img_fore * mask_fore
-        all_clothes_label = changearm(data['label'])
-
         with torch.no_grad():
+
+            t_mask = torch.FloatTensor((data['label'].cpu().numpy() == 7).astype(np.float))
+            mask_clothes = torch.FloatTensor((data['label'].cpu().numpy() == 4).astype(np.int))
+            mask_fore = torch.FloatTensor((data['label'].cpu().numpy() > 0).astype(np.int))
+            img_fore = data['image'] * mask_fore
+            img_fore_wc = img_fore * mask_fore
+            all_clothes_label = changearm(data['label'])
+
             ############## Forward Pass ######################
-            losses, fake_image, real_image, input_label, L1_loss, style_loss, clothes_mask, CE_loss, rgb, alpha = model(
+            losses, output, prod_image, input_label, L1_loss, style_loss, clothes_mask, CE_loss, rgb, alpha = model(
                 Variable(data['label'].cuda()), Variable(data['edge'].cuda()), Variable(img_fore.cuda()),
                 Variable(mask_clothes.cuda())
                 , Variable(data['color'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
                 Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
 
-        # sum per device losses
-        losses = [torch.mean(x) if not isinstance(x, int) else x for x in losses]
-        loss_dict = dict(zip(model.module.loss_names, losses))
-
-        # calculate final loss scalar
-        loss_D = (loss_dict['D_fake'] + loss_dict['D_real']) * 0.5
-        loss_G = loss_dict['G_GAN'] + torch.mean(
-            CE_loss)  # loss_dict.get('G_GAN_Feat',0)+torch.mean(L1_loss)+loss_dict.get('G_VGG',0)
-
-        writer.add_scalar('loss_d', loss_D, step)
-        writer.add_scalar('loss_g_gan', loss_dict['G_GAN'], step)
-        ############## Display results and errors ##########
+            _, output_2, prod_image_2, _, _, _, _, _, gt_rgb_2, _ = model(
+                Variable(data['label'].cuda()), Variable(data2['edge'].cuda()), Variable(img_fore.cuda()),
+                Variable(mask_clothes.cuda())
+                , Variable(data2['color'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
+                Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
 
         ### display output images
-        a = generate_label_color(generate_label_plain(input_label)).float().cuda()
-        b = real_image.float().cuda()
-        c = fake_image.float().cuda()
-        d = torch.cat([clothes_mask, clothes_mask, clothes_mask], 1)
-        combine = torch.cat([a[0], d[0], b[0], c[0], rgb[0]], 2).squeeze()
+        seg_label_1 = generate_label_color(generate_label_plain(input_label)).float().cuda()
+        prod_1 = prod_image.float().cuda()
+        output_1 = output.float().cuda()
+        prod_1_mask = torch.cat([clothes_mask, clothes_mask, clothes_mask], 1)
+
+        prod_2 = prod_image_2.float().cuda()
+        output_2 = output_2.float().cuda()
+
+        combine = torch.cat([data['image'].cuda()[0], data['color'].cuda()[0], seg_label_1[0], prod_1_mask[0], prod_1[0], prod_2[0], output_1[0], output_2[0], rgb[0], gt_rgb_2[0]], 2).squeeze()
         # combine=c[0].squeeze()
         cv_img = (combine.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2
         if step % 1 == 0:
@@ -166,6 +156,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
             n = str(step) + '.jpg'
             cv2.imwrite(tmp_img_dir + data['name'][0], bgr)
+        break
 
     # end of epoch
     iter_end_time = time.time()

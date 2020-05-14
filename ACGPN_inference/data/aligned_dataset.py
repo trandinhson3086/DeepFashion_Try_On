@@ -76,6 +76,9 @@ class AlignedDataset(BaseDataset):
             self.dir_A = os.path.join(opt.dataroot, opt.phase + dir_A)
             self.A_paths = sorted(make_dataset_test(self.dir_A))
 
+        print(self.A_paths[:5])
+        print(self.C_paths[:5])
+
 
     def random_sample(self,item):
         name = item.split('/')[-1]
@@ -102,7 +105,8 @@ class AlignedDataset(BaseDataset):
 
 
     def get_item(self, index):
-        test = np.random.randint(2032)
+        # test = np.random.randint(2032)
+        test = index
         A_path = self.A_paths[index]
         AR_path = self.AR_paths[index]
         A = Image.open(A_path).convert('L')
@@ -157,7 +161,7 @@ class AlignedDataset(BaseDataset):
         E_tensor = transform_A(E)
 
         ##Pose
-        pose_name = B_path.replace('.jpg', '_keypoints.json').replace('test_img', 'test_pose')
+        pose_name = B_path.replace('.jpg', '_keypoints.json').replace('_img', '_pose')
         with open(osp.join(pose_name), 'r') as f:
             pose_label = json.load(f)
             pose_data = pose_label['people'][0]['pose_keypoints']
@@ -180,15 +184,11 @@ class AlignedDataset(BaseDataset):
             one_map = transform_B(one_map.convert('RGB'))
             pose_map[i] = one_map[0]
         P_tensor = pose_map
-        if self.opt.isTrain:
-            input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
-                          'path': A_path, 'path_ref': AR_path,
-                          'edge': E_tensor, 'color': C_tensor, 'mask': M_tensor, 'colormask': MC_tensor,
-                          'pose': P_tensor, 'name': name
-                          }
-        else:
-            input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
-                          'path': A_path, 'path_ref': AR_path}
+        input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
+                      'path': A_path, 'path_ref': AR_path,
+                      'edge': E_tensor, 'color': C_tensor, 'mask': M_tensor, 'colormask': MC_tensor,
+                      'pose': P_tensor, 'name': name
+                      }
 
         return input_dict
 
