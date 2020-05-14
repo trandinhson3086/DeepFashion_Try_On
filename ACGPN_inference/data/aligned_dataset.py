@@ -76,9 +76,6 @@ class AlignedDataset(BaseDataset):
             self.dir_A = os.path.join(opt.dataroot, opt.phase + dir_A)
             self.A_paths = sorted(make_dataset_test(self.dir_A))
 
-        print(self.A_paths[:5])
-        print(self.C_paths[:5])
-
 
     def random_sample(self,item):
         name = item.split('/')[-1]
@@ -160,6 +157,20 @@ class AlignedDataset(BaseDataset):
         E = Image.open(E_path).convert('L')
         E_tensor = transform_A(E)
 
+        alternative_index = random.choice(range(len(self)))
+        while alternative_index == index:
+            alternative_index = random.choice(range(len(self)))
+
+        C_path_2 = self.C_paths[alternative_index]
+        C_2 = Image.open(C_path_2).convert('RGB')
+        C_tensor_2 = transform_B(C_2)
+
+        ##Edge
+        E_path_2 = self.E_paths[alternative_index]
+        # print(E_path)
+        E_2 = Image.open(E_path_2).convert('L')
+        E_tensor_2 = transform_A(E_2)
+
         ##Pose
         pose_name = B_path.replace('.jpg', '_keypoints.json').replace('_img', '_pose')
         with open(osp.join(pose_name), 'r') as f:
@@ -184,15 +195,18 @@ class AlignedDataset(BaseDataset):
             one_map = transform_B(one_map.convert('RGB'))
             pose_map[i] = one_map[0]
         P_tensor = pose_map
+
+
         input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
                       'path': A_path, 'path_ref': AR_path,
-                      'edge': E_tensor, 'color': C_tensor, 'mask': M_tensor, 'colormask': MC_tensor,
+                      'edge': E_tensor, 'color': C_tensor,  'edge2': E_tensor_2, 'color2': C_tensor_2, 'mask': M_tensor, 'colormask': MC_tensor,
                       'pose': P_tensor, 'name': name
                       }
 
         return input_dict
 
     def __getitem__(self, index):
+        return self.get_item(index)
         if self.opt.phase == "test":
             return self.get_item(index)
         else:

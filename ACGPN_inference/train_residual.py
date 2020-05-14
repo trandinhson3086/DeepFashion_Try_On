@@ -8,11 +8,34 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
+from visualization import board_add_images
 import cv2
+import torch.nn as nn
+from resnet import Embedder
+from unet import UNet, VGGExtractor, Discriminator
+import torch.nn.init as init
+from tqdm import tqdm
+import torch.nn.functional as F
 
-writer = SummaryWriter('runs/Test')
+from distributed import (
+    get_rank,
+    synchronize,
+    reduce_loss_dict,
+    reduce_sum,
+    get_world_size,
+)
+import utils
+
+
 SIZE = 320
 NC = 14
+
+lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
+lambdas = {'adv': 0.25, 'identity': 20, 'mse': 50, 'vis_reg': 1, 'consist': 5}
+
+
+def single_gpu_flag(args):
+    return not args.distributed or (args.distributed and args.local_rank % torch.cuda.device_count() == 0)
 
 def generate_label_plain(inputs):
     size = inputs.size()
@@ -28,6 +51,27 @@ def generate_label_plain(inputs):
 
     return label_batch
 
+def weights_init(init_type='gaussian'):
+    def init_fun(m):
+        classname = m.__class__.__name__
+        if (classname.find('Conv') == 0 or classname.find('Linear') == 0) and hasattr(m, 'weight'):
+            # print m.__class__.__name__
+            if init_type == 'gaussian':
+                init.normal_(m.weight.data, 0.0, 0.02)
+            elif init_type == 'xavier':
+                init.xavier_normal_(m.weight.data, gain=math.sqrt(2))
+            elif init_type == 'kaiming':
+                init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+            elif init_type == 'orthogonal':
+                init.orthogonal_(m.weight.data, gain=math.sqrt(2))
+            elif init_type == 'default':
+                pass
+            else:
+                assert 0, "Unsupported initialization: {}".format(init_type)
+            if hasattr(m, 'bias') and m.bias is not None:
+                init.constant_(m.bias.data, 0.0)
+
+    return init_fun
 
 def generate_label_color(inputs):
     label_batch = []
@@ -71,9 +115,11 @@ def changearm(old_label):
     label = label * (1 - noise) + noise * 4
     return label
 
-tmp_img_dir = 'sample_tr2/'
-os.makedirs(tmp_img_dir, exist_ok=True)
+
 opt = TrainOptions().parse()
+
+os.makedirs(os.path.join("checkpoints", opt.name), exist_ok=True)
+
 iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
 if opt.continue_train:
     try:
@@ -91,12 +137,19 @@ if opt.debug:
     opt.niter_decay = 0
     opt.max_dataset_size = 10
 
+n_gpu = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
+opt.distributed = n_gpu > 1
+local_rank = opt.local_rank
+
+if opt.distributed:
+    torch.cuda.set_device(opt.local_rank)
+    torch.distributed.init_process_group(backend='nccl', init_method='env://')
+    synchronize()
+
 data_loader = CreateDataLoader(opt)
 dataset = data_loader.load_data()
 dataset_size = len(data_loader)
 print('#training images = %d' % dataset_size)
-
-model = create_model(opt)
 
 total_steps = (start_epoch - 1) * dataset_size + epoch_iter
 
@@ -104,14 +157,83 @@ display_delta = total_steps % opt.display_freq
 print_delta = total_steps % opt.print_freq
 save_delta = total_steps % opt.save_latest_freq
 
+l1_criterion = nn.L1Loss()
+mse_criterion = nn.MSELoss()
+vgg_extractor = VGGExtractor().cuda().eval()
+adv_criterion = utils.AdversarialLoss('lsgan').cuda()
+
+def load_checkpoint(model, checkpoint_path):
+    if not os.path.exists(checkpoint_path):
+        return
+    model.load_state_dict(torch.load(checkpoint_path))
+    model.cuda()
+
+def save_checkpoint(model, save_path):
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+
+    torch.save(model.state_dict(), save_path)
+
+
+if single_gpu_flag(opt):
+    board = SummaryWriter(os.path.join('runs', opt.name))
+
+
+prev_model = create_model(opt)
+prev_model.cuda()
+
+
+embedder_model = Embedder()
+load_checkpoint(embedder_model, "../cp-vton/checkpoints/identity_train_64_dim/step_020000.pth")
+image_embedder = embedder_model.embedder_b.cuda()
+
+model = UNet(n_channels=4, n_classes=3)
+if opt.distributed:
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+model.apply(weights_init('kaiming'))
+model.cuda()
+
+if opt.use_gan:
+    discriminator = Discriminator()
+    discriminator.apply(utils.weights_init('gaussian'))
+    discriminator.cuda()
+
+model_module = model
+if opt.use_gan:
+    discriminator_module = discriminator
+if opt.distributed:
+    model = torch.nn.parallel.DistributedDataParallel(model,
+                                                      device_ids=[local_rank],
+                                                      output_device=local_rank,
+                                                      find_unused_parameters=True)
+    model_module = model.module
+    if opt.use_gan:
+        discriminator = torch.nn.parallel.DistributedDataParallel(discriminator,
+                                                                  device_ids=[local_rank],
+                                                                  output_device=local_rank,
+                                                                  find_unused_parameters=True)
+        discriminator_module = discriminator.module
+
+image_embedder.eval()
+model.train()
+
+# optimizer
+optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.5, 0.999))
+if opt.use_gan:
+    D_optim = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(0.5, 0.999), weight_decay=1e-4)
+
 step = 0
 
 for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
     epoch_start_time = time.time()
     if epoch != start_epoch:
         epoch_iter = epoch_iter % dataset_size
-    for i, (data, data2) in enumerate(dataset, start=epoch_iter):
 
+    pbar = enumerate(dataset, start=epoch_iter)
+    if single_gpu_flag(opt):
+        pbar = tqdm(pbar)
+
+    for i, data in pbar:
         iter_start_time = time.time()
         total_steps += opt.batchSize
         epoch_iter += opt.batchSize
@@ -126,55 +248,131 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             all_clothes_label = changearm(data['label'])
 
             ############## Forward Pass ######################
-            losses, output, prod_image, input_label, L1_loss, style_loss, clothes_mask, CE_loss, rgb, alpha = model(
+            losses, transfer_1, prod_image, input_label, L1_loss, style_loss, clothes_mask, CE_loss, rgb, alpha = prev_model(
                 Variable(data['label'].cuda()), Variable(data['edge'].cuda()), Variable(img_fore.cuda()),
                 Variable(mask_clothes.cuda())
                 , Variable(data['color'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
                 Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
 
-            _, output_2, prod_image_2, _, _, _, _, _, gt_rgb_2, _ = model(
-                Variable(data['label'].cuda()), Variable(data2['edge'].cuda()), Variable(img_fore.cuda()),
+            _, transfer_2, prod_image_2, _, _, _, _, _, gt_rgb_2, _ = prev_model(
+                Variable(data['label'].cuda()), Variable(data['edge2'].cuda()), Variable(img_fore.cuda()),
                 Variable(mask_clothes.cuda())
-                , Variable(data2['color'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
+                , Variable(data['color2'].cuda()), Variable(all_clothes_label.cuda()), Variable(data['image'].cuda()),
                 Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
+
+
+        gt_residual = (torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1) / 2
+
+        output_1 = model(torch.cat([transfer_1, gt_residual.detach()], dim=1))
+        output_2 = model(torch.cat([transfer_2, gt_residual.detach()], dim=1))
+
+        embedding_1 = image_embedder(output_1)
+        embedding_2 = image_embedder(output_2)
+
+        embedding_1_t = image_embedder(transfer_1)
+        embedding_2_t = image_embedder(transfer_2)
+
+        if opt.use_gan:
+            # train discriminator
+            real_L_logit, real_L_cam_logit, real_G_logit, real_G_cam_logit = discriminator(F.interpolate(data['image'].cuda(), size=(256, 256), mode='bilinear'))
+            fake_L_logit_1, fake_L_cam_logit_1, fake_G_logit_1, fake_G_cam_logit_1 = discriminator(F.interpolate(output_1, size=(256, 256), mode='bilinear').detach())
+            fake_L_logit_2, fake_L_cam_logit_2, fake_G_logit_2, fake_G_cam_logit_2 = discriminator(F.interpolate(output_2, size=(256, 256), mode='bilinear').detach())
+
+            D_true_loss = adv_criterion(real_L_logit, True) + \
+                     adv_criterion(real_G_logit, True) + \
+                     adv_criterion(real_L_cam_logit, True) + \
+                     adv_criterion(real_G_cam_logit, True)
+            D_fake_loss =  adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), False) + \
+                     adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), False) + \
+                     adv_criterion(torch.cat([fake_L_logit_1, fake_L_logit_2], dim=0), False) + \
+                     adv_criterion(torch.cat([fake_G_logit_1, fake_G_logit_2], dim=0), False)
+
+            D_loss = D_true_loss + D_fake_loss
+            D_optim.zero_grad()
+            D_loss.backward()
+            D_optim.step()
+
+            # train generator
+            fake_L_logit_1, fake_L_cam_logit_1, fake_G_logit_1, fake_G_cam_logit_1 = discriminator(F.interpolate(output_1, size=(256, 256), mode='bilinear'))
+            fake_L_logit_2, fake_L_cam_logit_2, fake_G_logit_2, fake_G_cam_logit_2 = discriminator(F.interpolate(output_2, size=(256, 256), mode='bilinear'))
+
+            G_adv_loss = adv_criterion(torch.cat([fake_L_logit_1, fake_L_logit_2], dim=0), True) + \
+                         adv_criterion(torch.cat([fake_G_logit_1, fake_G_logit_2], dim=0), True) + \
+                         adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), True) + \
+                         adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), True)
+
+
+        # mse loss
+        mse_loss = mse_criterion(output_1, data['image'].cuda())
+
+        # identity loss
+        identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t)
+
+        # vis reg loss
+        output_1_feats = vgg_extractor(output_1)
+        transfer_1_feats = vgg_extractor(transfer_1)
+        output_2_feats = vgg_extractor(output_2)
+        transfer_2_feats = vgg_extractor(transfer_2)
+
+        style_reg = utils.compute_style_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_style_loss(output_2_feats, transfer_2_feats, l1_criterion)
+        perceptual_reg = utils.compute_perceptual_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_perceptual_loss(output_2_feats, transfer_2_feats, l1_criterion)
+        l1_reg = l1_criterion(output_1, transfer_1) + l1_criterion(output_2, transfer_2)
+
+        vis_reg_loss = l1_reg * lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
+
+        # consistency loss
+        consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)
+
 
         ### display output images
         seg_label_1 = generate_label_color(generate_label_plain(input_label)).float().cuda()
         prod_1 = prod_image.float().cuda()
-        output_1 = output.float().cuda()
         prod_1_mask = torch.cat([clothes_mask, clothes_mask, clothes_mask], 1)
-
         prod_2 = prod_image_2.float().cuda()
-        output_2 = output_2.float().cuda()
 
-        combine = torch.cat([data['image'].cuda()[0], data['color'].cuda()[0], seg_label_1[0], prod_1_mask[0], prod_1[0], prod_2[0], output_1[0], output_2[0], rgb[0], gt_rgb_2[0]], 2).squeeze()
-        # combine=c[0].squeeze()
-        cv_img = (combine.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2
-        if step % 1 == 0:
-            writer.add_image('combine', (combine.data + 1) / 2.0, step)
-            rgb = (cv_img * 255).astype(np.uint8)
-            bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-            n = str(step) + '.jpg'
-            cv2.imwrite(tmp_img_dir + data['name'][0], bgr)
-        break
+        total_loss = lambdas['identity'] * identity_loss + \
+                     lambdas['mse'] * mse_loss + \
+                     lambdas['vis_reg'] * vis_reg_loss + \
+                     lambdas['consist'] * consistency_loss
 
-    # end of epoch
-    iter_end_time = time.time()
-    print('End of epoch %d / %d \t Time Taken: %d sec' %
-          (epoch, opt.niter + opt.niter_decay, time.time() - epoch_start_time))
-    break
+        if opt.use_gan:
+            total_loss += lambdas['adv'] * G_adv_loss
 
-    ### save model for this epoch
-    if epoch % opt.save_epoch_freq == 0:
-        print('saving the model at the end of epoch %d, iters %d' % (epoch, total_steps))
-        model.module.save('latest')
-        model.module.save(epoch)
-        # np.savetxt(iter_path, (epoch+1, 0), delimiter=',', fmt='%d')
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
 
-    ### instead of only training the local enhancer, train the entire network after certain iterations
-    if (opt.niter_fix_global != 0) and (epoch == opt.niter_fix_global):
-        model.module.update_fixed_params()
+        if single_gpu_flag(opt):
 
-    ### linearly decay learning rate after certain iterations
-    if epoch > opt.niter:
-        model.module.update_learning_rate()
+            if (step + 1) % 100 == 0:
+                visuals = [[seg_label_1.cpu(), prod_1_mask.cpu(), data['image']],
+                           [data['color'], data['color2'], torch.cat([gt_residual, gt_residual, gt_residual], dim=1)],
+                           [transfer_1, output_1, (transfer_1 - output_1) / 2],
+                           [transfer_2, output_2, (transfer_2 - output_2) / 2]]
+                # combine=c[0].squeeze()
+                # cv_img = (combine.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2
+                # if step % 1 == 0:
+                #     writer.add_image('combine', (combine.data + 1) / 2.0, step)
+                #     rgb = (cv_img * 255).astype(np.uint8)
+                #     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                #     n = str(step) + '.jpg'
+                #     cv2.imwrite(tmp_img_dir + data['name'][0], bgr)
+                board_add_images(board, str(step + 1), visuals, step + 1)
+            board.add_scalar('loss/total', total_loss.item(), step + 1)
+            board.add_scalar('loss/identity', identity_loss.item(), step + 1)
+            board.add_scalar('loss/vis_reg', vis_reg_loss.item(), step + 1)
+            board.add_scalar('loss/mse', mse_loss.item(), step + 1)
+            board.add_scalar('loss/consist', consistency_loss.item(), step + 1)
+            if opt.use_gan:
+                board.add_scalar('loss/Dadv', D_loss.item(),  step + 1)
+                board.add_scalar('loss/Gadv', G_adv_loss.item(),  step + 1)
+
+            pbar.set_description('step: %8d, loss: %.4f, identity: %.4f, vis_reg: %.4f, mse: %.4f, consist: %.4f'
+                  % (step + 1, total_loss.item(), identity_loss.item(),
+                     vis_reg_loss.item(), mse_loss.item(), consistency_loss.item()))
+
+        if (step+1) % opt.save_count == 0 and single_gpu_flag(opt):
+            save_checkpoint(model_module, os.path.join("checkpoints", opt.name, 'step_%06d.pth' % (step + 1)))
+            if opt.use_gan:
+                save_checkpoint(discriminator_module, os.path.join("checkpoints", opt.name, 'step_disc_%06d.pth' % (step + 1)))
+        step += 1
