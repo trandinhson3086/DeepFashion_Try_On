@@ -31,6 +31,8 @@ class TrainOptions(BaseOptions):
         self.parser.add_argument('--no_lsgan', action='store_true', help='do *not* use least square GAN, if false, use vanilla GAN')
         self.parser.add_argument('--pool_size', type=int, default=0, help='the size of image buffer that stores previously generated images')
 
+        self.parser.add_argument("--no_consist", action='store_true')
+
         self.parser.add_argument('--local_rank', type=int, default=0, help='the size of image buffer that stores previously generated images')
         self.isTrain = True
 

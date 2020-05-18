@@ -14,12 +14,25 @@ class AlignedDataset(BaseDataset):
         self.opt = opt
         self.root = opt.dataroot    
         self.diction={}
+
+        im_names = []
+        c_names = []
+        if opt.data_list != None:
+            opt.phase = "combined"
+            with open(osp.join(opt.data_list), 'r') as f:
+                for line in f.readlines():
+                    im_name, c_name = line.strip().split()
+                    im_names.append(im_name)
+                    c_names.append(c_name)
+
         ### input A (label maps)
         if opt.isTrain or opt.use_encoded_image:
             dir_A = '_A' if self.opt.label_nc == 0 else '_label'
             self.dir_A = os.path.join(opt.dataroot, opt.phase + dir_A)
             self.A_paths = sorted(make_dataset(self.dir_A))
             self.AR_paths = make_dataset(self.dir_A)
+            if opt.data_list != None:
+                self.A_paths = [os.path.join(self.dir_A, n).replace(".jpg", ".png") for n in im_names]
 
         self.fine_height=256
         self.fine_width=192
@@ -39,6 +52,9 @@ class AlignedDataset(BaseDataset):
         self.B_paths = sorted(make_dataset(self.dir_B))
         self.BR_paths = sorted(make_dataset(self.dir_B))
 
+        if opt.data_list != None:
+            self.B_paths = [os.path.join(self.dir_B, n) for n in im_names]
+
         self.dataset_size = len(self.A_paths)
         self.build_index(self.B_paths)
 
@@ -49,25 +65,31 @@ class AlignedDataset(BaseDataset):
             self.E_paths = sorted(make_dataset(self.dir_E))
             self.ER_paths = make_dataset(self.dir_E)
 
-        ### input M (masks)
-        if opt.isTrain or opt.use_encoded_image:
-            dir_M = '_mask'
-            self.dir_M = os.path.join(opt.dataroot, opt.phase + dir_M)
-            self.M_paths = sorted(make_dataset(self.dir_M))
-            self.MR_paths = make_dataset(self.dir_M)
+            if opt.data_list != None:
+                self.E_paths = [os.path.join(self.dir_E, n) for n in c_names]
 
-        ### input MC(color_masks)
-        if opt.isTrain or opt.use_encoded_image:
-            dir_MC = '_colormask'
-            self.dir_MC = os.path.join(opt.dataroot, opt.phase + dir_MC)
-            self.MC_paths = sorted(make_dataset(self.dir_MC))
-            self.MCR_paths = make_dataset(self.dir_MC)
+        # ### input M (masks)
+        # if opt.isTrain or opt.use_encoded_image:
+        #     dir_M = '_mask'
+        #     self.dir_M = os.path.join(opt.dataroot, opt.phase + dir_M)
+        #     self.M_paths = sorted(make_dataset(self.dir_M))
+        #     self.MR_paths = make_dataset(self.dir_M)
+        #
+        # ### input MC(color_masks)
+        # if opt.isTrain or opt.use_encoded_image:
+        #     dir_MC = '_colormask'
+        #     self.dir_MC = os.path.join(opt.dataroot, opt.phase + dir_MC)
+        #     self.MC_paths = sorted(make_dataset(self.dir_MC))
+        #     self.MCR_paths = make_dataset(self.dir_MC)
         ### input C(color)
         if opt.isTrain or opt.use_encoded_image:
             dir_C = '_color'
             self.dir_C = os.path.join(opt.dataroot, opt.phase + dir_C)
             self.C_paths = sorted(make_dataset(self.dir_C))
             self.CR_paths = make_dataset(self.dir_C)
+
+            if opt.data_list != None:
+                self.C_paths = [os.path.join(self.dir_C, n) for n in c_names]
         # self.build_index(self.C_paths)
 
         ### input A test (label maps)
@@ -105,45 +127,45 @@ class AlignedDataset(BaseDataset):
         # test = np.random.randint(2032)
         test = index
         A_path = self.A_paths[index]
-        AR_path = self.AR_paths[index]
+        # AR_path = self.AR_paths[index]
         A = Image.open(A_path).convert('L')
-        AR = Image.open(AR_path).convert('L')
+        # AR = Image.open(AR_path).convert('L')
 
         params = get_params(self.opt, A.size)
         if self.opt.label_nc == 0:
             transform_A = get_transform(self.opt, params)
             A_tensor = transform_A(A.convert('RGB'))
-            AR_tensor = transform_A(AR.convert('RGB'))
+            # AR_tensor = transform_A(AR.convert('RGB'))
         else:
             transform_A = get_transform(self.opt, params, method=Image.NEAREST, normalize=False)
             A_tensor = transform_A(A) * 255.0
 
-            AR_tensor = transform_A(AR) * 255.0
+            # AR_tensor = transform_A(AR) * 255.0
         B_tensor = inst_tensor = feat_tensor = 0
         ### input B (real images)
 
         B_path = self.B_paths[index]
         name = B_path.split('/')[-1]
 
-        BR_path = self.BR_paths[index]
+        # BR_path = self.BR_paths[index]
         B = Image.open(B_path).convert('RGB')
-        BR = Image.open(BR_path).convert('RGB')
+        # BR = Image.open(BR_path).convert('RGB')
         transform_B = get_transform(self.opt, params)
         B_tensor = transform_B(B)
-        BR_tensor = transform_B(BR)
+        # BR_tensor = transform_B(BR)
 
-        ### input M (masks)
-        M_path = B_path  # self.M_paths[np.random.randint(1)]
-        MR_path = B_path  # self.MR_paths[np.random.randint(1)]
-        M = Image.open(M_path).convert('L')
-        MR = Image.open(MR_path).convert('L')
-        M_tensor = transform_A(MR)
-
-        ### input_MC (colorMasks)
-        MC_path = B_path  # self.MC_paths[1]
-        MCR_path = B_path  # self.MCR_paths[1]
-        MCR = Image.open(MCR_path).convert('L')
-        MC_tensor = transform_A(MCR)
+        # ### input M (masks)
+        # M_path = B_path  # self.M_paths[np.random.randint(1)]
+        # MR_path = B_path  # self.MR_paths[np.random.randint(1)]
+        # M = Image.open(M_path).convert('L')
+        # MR = Image.open(MR_path).convert('L')
+        # M_tensor = transform_A(MR)
+        #
+        # ### input_MC (colorMasks)
+        # MC_path = B_path  # self.MC_paths[1]
+        # MCR_path = B_path  # self.MCR_paths[1]
+        # MCR = Image.open(MCR_path).convert('L')
+        # MC_tensor = transform_A(MCR)
 
         ### input_C (color)
         # print(self.C_paths)
@@ -157,19 +179,29 @@ class AlignedDataset(BaseDataset):
         E = Image.open(E_path).convert('L')
         E_tensor = transform_A(E)
 
-        alternative_index = random.choice(range(len(self)))
-        while alternative_index == index:
+        if self.opt.phase == "combined":
+            C_path_2 = "/".join(C_path.split("/")[:-1] + [B_path.split("/")[-1].replace("_0", "_1")])
+            C_2 = Image.open(C_path_2).convert('RGB')
+            C_tensor_2 = transform_B(C_2)
+
+            E_path_2 = "/".join(E_path.split("/")[:-1] + [B_path.split("/")[-1].replace("_0", "_1")])
+            E_2 = Image.open(E_path_2).convert('L')
+            E_tensor_2 = transform_A(E_2)
+
+        else:
             alternative_index = random.choice(range(len(self)))
+            while alternative_index == index:
+                alternative_index = random.choice(range(len(self)))
 
-        C_path_2 = self.C_paths[alternative_index]
-        C_2 = Image.open(C_path_2).convert('RGB')
-        C_tensor_2 = transform_B(C_2)
+            C_path_2 = self.C_paths[alternative_index]
+            C_2 = Image.open(C_path_2).convert('RGB')
+            C_tensor_2 = transform_B(C_2)
 
-        ##Edge
-        E_path_2 = self.E_paths[alternative_index]
-        # print(E_path)
-        E_2 = Image.open(E_path_2).convert('L')
-        E_tensor_2 = transform_A(E_2)
+            ##Edge
+            E_path_2 = self.E_paths[alternative_index]
+            # print(E_path)
+            E_2 = Image.open(E_path_2).convert('L')
+            E_tensor_2 = transform_A(E_2)
 
         ##Pose
         pose_name = B_path.replace('.jpg', '_keypoints.json').replace('_img', '_pose')
@@ -197,24 +229,15 @@ class AlignedDataset(BaseDataset):
         P_tensor = pose_map
 
 
-        input_dict = {'label': A_tensor, 'label_ref': AR_tensor, 'image': B_tensor, 'image_ref': BR_tensor,
-                      'path': A_path, 'path_ref': AR_path,
-                      'edge': E_tensor, 'color': C_tensor,  'edge2': E_tensor_2, 'color2': C_tensor_2, 'mask': M_tensor, 'colormask': MC_tensor,
-                      'pose': P_tensor, 'name': name
-                      }
+        input_dict = {'label': A_tensor, 'image': B_tensor,
+                      'path': A_path,
+                      'edge': E_tensor, 'color': C_tensor,  'edge2': E_tensor_2, 'color2': C_tensor_2,
+                      'pose': P_tensor, 'name': name}
 
         return input_dict
 
     def __getitem__(self, index):
         return self.get_item(index)
-        if self.opt.phase == "test":
-            return self.get_item(index)
-        else:
-            alternative_index = random.choice(range(len(self)))
-            while alternative_index == index:
-                alternative_index = random.choice(range(len(self)))
-            return self.get_item(index), self.get_item(alternative_index)
-
 
     def __len__(self):
         return len(self.A_paths) // self.opt.batchSize * self.opt.batchSize

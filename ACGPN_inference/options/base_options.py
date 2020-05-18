@@ -10,7 +10,7 @@ class BaseOptions():
 
     def initialize(self):    
         # experiment specifics
-        self.parser.add_argument('--name', type=str, default='residual', help='name of the experiment. It decides where to store samples and models')
+        self.parser.add_argument('--name', type=str, default='test', help='name of the experiment. It decides where to store samples and models')
         self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
         self.parser.add_argument('--model', type=str, default='pix2pixHD', help='which model to use')
@@ -19,8 +19,11 @@ class BaseOptions():
         self.parser.add_argument('--data_type', default=32, type=int, choices=[8, 16, 32], help="Supported data type i.e. 8, 16, 32 bit")
         self.parser.add_argument('--verbose', action='store_true', default=False, help='toggles verbose')
 
+        self.parser.add_argument('--data_list', type=str, default=None, help='instance normalization or batch normalization')
+
+
         # input/output sizes       
-        self.parser.add_argument('--batchSize', type=int, default=8, help='input batch size')
+        self.parser.add_argument('-b', '--batchSize', type=int, default=6, help='input batch size')
         self.parser.add_argument('--loadSize', type=int, default=512, help='scale images to this size')
         self.parser.add_argument('--fineSize', type=int, default=512, help='then crop to this size')
         self.parser.add_argument('--label_nc', type=int, default=20, help='# of input label channels')
@@ -39,7 +42,7 @@ class BaseOptions():
         self.parser.add_argument('--display_winsize', type=int, default=512,  help='display window size')
         self.parser.add_argument('--tf_log', action='store_true', help='if specified, use tensorboard logging. Requires tensorflow installed')
 
-        self.parser.add_argument('--use_gan', action='store_true', help='if specified, use tensorboard logging. Requires tensorflow installed')
+        self.parser.add_argument('--use_gan', action='store_true', default=True, help='if specified, use tensorboard logging. Requires tensorflow installed')
         self.parser.add_argument('--checkpoint', type=str, default='')
 
 
