@@ -31,7 +31,8 @@ SIZE = 320
 NC = 14
 
 lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
-lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
+# lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
+lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 0}
 
 
 def single_gpu_flag(args):
@@ -118,8 +119,6 @@ def changearm(old_label):
 
 opt = TrainOptions().parse()
 
-os.makedirs(os.path.join("checkpoints", opt.name), exist_ok=True)
-
 iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
 if opt.continue_train:
     try:
@@ -140,6 +139,9 @@ if opt.debug:
 n_gpu = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
 opt.distributed = n_gpu > 1
 local_rank = opt.local_rank
+
+if single_gpu_flag(opt):
+    os.makedirs(os.path.join("checkpoints", opt.name), exist_ok=True)
 
 if opt.distributed:
     torch.cuda.set_device(opt.local_rank)

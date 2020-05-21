@@ -415,7 +415,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    root_path = "test_files_dir/identity_discriminator_2/"
+    root_path = "test_files_dir/rablation-no-identity/"
     paths = ["baseline", "refined"]
 
     for path in paths:

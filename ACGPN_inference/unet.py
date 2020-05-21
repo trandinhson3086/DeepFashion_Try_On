@@ -250,3 +250,4 @@ class AccDiscriminator(nn.Module):
     def forward(self, input1, input2):
         input = F.interpolate(torch.cat([input1, input2], 1), size=(256, 256), mode='bilinear')
         return self.model(input)
+

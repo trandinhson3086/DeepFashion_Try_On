@@ -230,7 +230,7 @@ for i, data in pbar:
 
         consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
-        gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_2, dim=1)).unsqueeze(1)) * consistent_mask
+        gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_2, dim=1)).unsqueeze(1) / 2) * consistent_mask
         output_1 = model(torch.cat([transfer_1, gt_residual.detach()], dim=1))
         output_2 = model(torch.cat([transfer_2, gt_residual.detach()], dim=1))
 
