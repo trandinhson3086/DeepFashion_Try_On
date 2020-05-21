@@ -32,7 +32,7 @@ NC = 14
 
 lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
 # lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
-lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 0}
+lambdas = {'adv': 0.25, 'identity': 500, 'match_gt': 20, 'vis_reg': .5, 'consist': 50}
 
 
 def single_gpu_flag(args):
@@ -309,10 +309,6 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
                          adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), True) + \
                          adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), True)
 
-
-        # mse loss
-        mse_loss = mse_criterion(output_1, data['image'].cuda())
-
         # identity loss
         identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t)
 
@@ -321,12 +317,16 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         transfer_1_feats = vgg_extractor(transfer_1)
         output_2_feats = vgg_extractor(output_2)
         transfer_2_feats = vgg_extractor(transfer_2)
+        gt_feats = vgg_extractor(data['image'].cuda())
 
         style_reg = utils.compute_style_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_style_loss(output_2_feats, transfer_2_feats, l1_criterion)
         perceptual_reg = utils.compute_perceptual_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_perceptual_loss(output_2_feats, transfer_2_feats, l1_criterion)
         l1_reg = l1_criterion(output_1, transfer_1) + l1_criterion(output_2, transfer_2)
 
         vis_reg_loss = l1_reg * lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
+
+        # match gt loss
+        match_gt_loss = l1_criterion(output_1, data['image'].cuda()) * lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
 
         # consistency loss
         consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)
@@ -339,7 +339,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         prod_2 = prod_image_2.float().cuda()
 
         total_loss = lambdas['identity'] * identity_loss + \
-                     lambdas['mse'] * mse_loss + \
+                     lambdas['match_gt'] * match_gt_loss + \
                      lambdas['vis_reg'] * vis_reg_loss + \
                      lambdas['consist'] * consistency_loss
 
@@ -369,7 +369,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             board.add_scalar('loss/total', total_loss.item(), step + 1)
             board.add_scalar('loss/identity', identity_loss.item(), step + 1)
             board.add_scalar('loss/vis_reg', vis_reg_loss.item(), step + 1)
-            board.add_scalar('loss/mse', mse_loss.item(), step + 1)
+            board.add_scalar('loss/match_gt', match_gt_loss.item(), step + 1)
             board.add_scalar('loss/consist', consistency_loss.item(), step + 1)
             if opt.use_gan:
                 board.add_scalar('loss/Dadv', D_loss.item(),  step + 1)
@@ -377,7 +377,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
 
             pbar.set_description('step: %8d, loss: %.4f, identity: %.4f, vis_reg: %.4f, mse: %.4f, consist: %.4f'
                   % (step + 1, total_loss.item(), identity_loss.item(),
-                     vis_reg_loss.item(), mse_loss.item(), consistency_loss.item()))
+                     vis_reg_loss.item(), match_gt_loss.item(), consistency_loss.item()))
 
         if (step+1) % opt.save_count == 0 and single_gpu_flag(opt):
             save_checkpoint(model_module, os.path.join("checkpoints", opt.name, 'step_%06d.pth' % (step + 1)))
