@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="f135194e-4ea3-4ba1-a4fb-1375815e214c" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="1bruSbrmLFUbha0u8znq6Zn1wjp" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.highlight.mappings" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.highlight.symlinks" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.date" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.permissions" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.size" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/ACGPN_inference" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/ACGPN_inference" />
+    </key>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="f135194e-4ea3-4ba1-a4fb-1375815e214c" name="Default Changelist" comment="" />
+      <created>1589402533338</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1589402533338</updated>
+      <workItem from="1589402534591" duration="21682000" />
+      <workItem from="1589500889055" duration="34014000" />
+      <workItem from="1589910228816" duration="33343000" />
+      <workItem from="1590188604094" duration="852000" />
+      <workItem from="1590267550715" duration="2111000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="1" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="955" y="270" key="#Deployment" timestamp="1589402775146">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state x="955" y="270" key="#Deployment/0.23.2560.1417@0.23.2560.1417" timestamp="1589402775146" />
+    <state x="931" y="449" key="#com.intellij.fileTypes.FileTypeChooser" timestamp="1589413888837">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state x="931" y="449" key="#com.intellij.fileTypes.FileTypeChooser/0.23.2560.1417@0.23.2560.1417" timestamp="1589413888837" />
+    <state width="2158" height="347" key="GridCell.Tab.0.bottom" timestamp="1589500830613">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2158" height="347" key="GridCell.Tab.0.bottom/0.23.2560.1417@0.23.2560.1417" timestamp="1589500830613" />
+    <state width="2158" height="347" key="GridCell.Tab.0.center" timestamp="1589500830613">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2158" height="347" key="GridCell.Tab.0.center/0.23.2560.1417@0.23.2560.1417" timestamp="1589500830613" />
+    <state width="2158" height="347" key="GridCell.Tab.0.left" timestamp="1589500830612">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2158" height="347" key="GridCell.Tab.0.left/0.23.2560.1417@0.23.2560.1417" timestamp="1589500830612" />
+    <state width="2158" height="347" key="GridCell.Tab.0.right" timestamp="1589500830613">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2158" height="347" key="GridCell.Tab.0.right/0.23.2560.1417@0.23.2560.1417" timestamp="1589500830613" />
+    <state x="1251" y="543" key="publish.login" timestamp="1589512972704">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state x="1251" y="543" key="publish.login/0.23.2560.1417@0.23.2560.1417" timestamp="1589512972704" />
+    <state x="964" y="302" width="670" height="58" key="search.everywhere.popup" timestamp="1589436832645">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state x="964" y="302" width="670" height="58" key="search.everywhere.popup/0.23.2560.1417@0.23.2560.1417" timestamp="1589436832645" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/DeepFashion_Try_On$train_residual.coverage" NAME="train_residual Coverage Results" MODIFIED="1589416350388" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ACGPN_inference" />
+  </component>
+</project>

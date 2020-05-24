@@ -1,0 +1,4 @@
+Data_preprocessing/
+Data_preprocessing/train.zip
+ACGPN_inference/test_files_dir
+*.pth
