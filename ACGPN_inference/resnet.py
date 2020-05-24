@@ -132,3 +132,91 @@ def resnet18(pretrained=False, **kwargs):
                 state[k] = loaded_state_dict[k]
         model.load_state_dict(state)
     return model
+
+class ResBlocks(nn.Module):
+    def __init__(self, num_blocks, dim, norm='in', activation='relu', pad_type='zero'):
+        super(ResBlocks, self).__init__()
+        self.model = []
+        for i in range(num_blocks):
+            self.model += [ResBlock(dim, norm=norm, activation=activation, pad_type=pad_type)]
+        self.model = nn.Sequential(*self.model)
+
+    def forward(self, x):
+        return self.model(x)
+
+class ResBlock(nn.Module):
+    def __init__(self, dim, norm='in', activation='relu', pad_type='zero'):
+        super(ResBlock, self).__init__()
+
+        model = []
+        model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
+        model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
+        self.model = nn.Sequential(*model)
+
+    def forward(self, x):
+        residual = x
+        out = self.model(x)
+        out += residual
+        return out
+
+class Conv2dBlock(nn.Module):
+    def __init__(self, input_dim ,output_dim, kernel_size, stride,
+                 padding=0, norm='none', activation='relu', pad_type='zero'):
+        super(Conv2dBlock, self).__init__()
+        self.use_bias = True
+        # initialize padding
+        if pad_type == 'reflect':
+            self.pad = nn.ReflectionPad2d(padding)
+        elif pad_type == 'replicate':
+            self.pad = nn.ReplicationPad2d(padding)
+        elif pad_type == 'zero':
+            self.pad = nn.ZeroPad2d(padding)
+        else:
+            assert 0, "Unsupported padding type: {}".format(pad_type)
+
+
+class ContentEncoder(nn.Module):
+    def __init__(self, n_downsample=2, n_res=4, input_dim=3, dim=64, norm='in', activ='relu', pad_type='reflect'):
+        super(ContentEncoder, self).__init__()
+        self.model = []
+        self.model += [Conv2dBlock(input_dim, dim, 7, 1, 3, norm=norm, activation=activ, pad_type=pad_type)]
+        # downsampling blocks
+        for i in range(n_downsample):
+            self.model += [Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
+            dim *= 2
+        # residual blocks
+        self.model += [ResBlocks(n_res, dim, norm=norm, activation=activ, pad_type=pad_type)]
+        self.model = nn.Sequential(*self.model)
+        self.output_dim = dim
+
+    def forward(self, x):
+        return self.model(x)
+
+class Decoder(nn.Module):
+    def __init__(self, n_upsample=2, n_res=4, dim=64, output_dim=3, res_norm='in', activ='relu', pad_type='reflect'):
+        super(Decoder, self).__init__()
+
+        self.model = []
+        # AdaIN residual blocks
+        self.model += [ResBlocks(n_res, dim, res_norm, activ, pad_type=pad_type)]
+        # upsampling blocks
+        for i in range(n_upsample):
+            self.model += [nn.Upsample(scale_factor=2),
+                           Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
+            dim //= 2
+        # use reflection padding in the last conv layer
+        self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='tanh', pad_type=pad_type)]
+        self.model = nn.Sequential(*self.model)
+
+    def forward(self, x):
+        return self.model(x)
+
+class Generator(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.encoder = ContentEncoder(input_dim=4)
+        self.decoder = Decoder(dim=self.encoder.output_dim, output_dim=1)
+
+    def forward(self, input, residual):
+        output = self.decoder(self.encoder(torch.cat([input, residual], dim=1)))
+        return input + output
