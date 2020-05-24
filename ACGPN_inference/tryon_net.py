@@ -205,14 +205,14 @@ class VGGExtractor(torch.nn.Module):
 class G(nn.Module):
     def __init__(self):
         super().__init__()
-        self.final = unet.UNet(6, 3)
+        # self.final = unet.UNet(6, 3)
         self.encoder = ContentEncoder(input_dim=4)
         self.decoder = Decoder(dim=self.encoder.output_dim)
     def forward(self, input, residual):
         ip = torch.cat([input, residual], dim=1)
         output = self.decoder(self.encoder(ip))
-        img_out = self.final(torch.cat([output, input], dim=1))
-        return output + input, img_out, output
+        # img_out = self.final(torch.cat([output, input], dim=1))
+        return (output + input).clamp(-1,1)
 
 class ContentEncoder(nn.Module):
     def __init__(self, n_downsample=2, n_res=4, input_dim=3, dim=64, norm='in', activ='relu', pad_type='reflect'):
@@ -244,7 +244,7 @@ class Decoder(nn.Module):
                            Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
             dim //= 2
         # use reflection padding in the last conv layer
-        self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='tanh', pad_type=pad_type)]
+        self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='none', pad_type=pad_type)]
         self.model = nn.Sequential(*self.model)
 
     def forward(self, x):

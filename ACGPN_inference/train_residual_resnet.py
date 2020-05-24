@@ -269,12 +269,9 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
         gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask
-        stage_1, output_1, res_1 = model(transfer_1.detach(), gt_residual.detach())
-        stage_2, output_2, res_2 = model(transfer_2.detach(), gt_residual.detach())
+        output_1 = model(transfer_1.detach(), gt_residual.detach())
+        output_2 = model(transfer_2.detach(), gt_residual.detach())
 
-
-        embedding_1_s = image_embedder(stage_1)
-        embedding_2_s = image_embedder(stage_2)
         embedding_1 = image_embedder(output_1)
         embedding_2 = image_embedder(output_2)
         embedding_1_t = image_embedder(transfer_1)
@@ -310,11 +307,9 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
                          adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), True)
 
         # identity loss
-        identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t) + mse_criterion(stage_1, embedding_1_t) + mse_criterion(stage_2, embedding_2_t)
+        identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t)
 
         # vis reg loss
-        stage_1_feats = vgg_extractor(stage_1)
-
         output_1_feats = vgg_extractor(output_1)
         transfer_1_feats = vgg_extractor(transfer_1)
         output_2_feats = vgg_extractor(output_2)
@@ -327,13 +322,11 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
 
         vis_reg_loss = l1_reg * lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
 
-        match_gt_stage = l1_criterion(stage_1, data['image'].cuda()) * lambdas_vis_reg["l1"] + utils.compute_style_loss(stage_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(stage_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
-
         # match gt loss
-        match_gt_loss = match_gt_stage + l1_criterion(output_1, data['image'].cuda()) * lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
+        match_gt_loss = l1_criterion(output_1, data['image'].cuda()) * lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
 
         # consistency loss
-        consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2) + mse_criterion(transfer_1 - stage_1, transfer_2 - stage_2)
+        consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)
 
 
         ### display output images
@@ -357,10 +350,10 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         if single_gpu_flag(opt):
 
             if (step + 1) % opt.display_freq == 0:
-                visuals = [[prod_1_mask.cpu(), torch.cat([clothes_mask_2, clothes_mask_2, clothes_mask_2], 1).cpu(),  data['image'], torch.cat([gt_residual, gt_residual, gt_residual], dim=1)],
-                           [data['color'], data['color2'], res_1, res_2],
-                           [transfer_1, stage_1, output_1, (output_1 - transfer_1)],
-                           [transfer_2, stage_2, output_2, (output_2 - transfer_2)]]
+                visuals = [[prod_1_mask.cpu(), torch.cat([clothes_mask_2, clothes_mask_2, clothes_mask_2], 1).cpu(),  data['image']],
+                           [data['color'], data['color2'], torch.cat([gt_residual, gt_residual, gt_residual], dim=1)],
+                           [transfer_1, output_1, (output_1 - transfer_1)],
+                           [transfer_2, output_2, (output_2 - transfer_2)]]
                 # combine=c[0].squeeze()
                 # cv_img = (combine.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2
                 # if step % 1 == 0:
