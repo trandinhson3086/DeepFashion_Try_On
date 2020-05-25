@@ -280,6 +280,7 @@ class Pix2PixHDModel(BaseModel):
         out+=smaller*fake_c
         out+=(1-mask)*fake_img
         return out
+
     def forward(self, label, pre_clothes_mask, img_fore, clothes_mask, clothes, all_clothes_label, real_image, pose,grid,mask_fore):
         # Encode Inputs
         input_label, masked_label, all_clothes_label = self.encode_input(label, clothes_mask, all_clothes_label)
@@ -326,7 +327,7 @@ class Pix2PixHDModel(BaseModel):
 
         fake_c, warped, warped_mask,warped_grid= self.Unet(clothes, fake_cl_dis, pre_clothes_mask,grid)
         mask=fake_c[:,3,:,:]
-        mask=self.sigmoid(mask)*fake_cl_dis
+        mask=self.sigmoid(mask).unsqueeze(1)*fake_cl_dis
         fake_c = self.tanh(fake_c[:,0:3,:,:])
         fake_c=fake_c*(1-mask)+mask*warped
         skin_color = self.ger_average_color((arm1_mask + arm2_mask - arm2_mask * arm1_mask),

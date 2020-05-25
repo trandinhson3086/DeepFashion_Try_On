@@ -3,8 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/models/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/models/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/models/pix2pixHD_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/models/pix2pixHD_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,7 +48,8 @@
       <option name="presentableId" value="Default" />
       <updated>1590305738237</updated>
       <workItem from="1590305739385" duration="8913000" />
-      <workItem from="1590363228523" duration="833000" />
+      <workItem from="1590363228523" duration="5339000" />
+      <workItem from="1590386070024" duration="2643000" />
     </task>
     <servers />
   </component>

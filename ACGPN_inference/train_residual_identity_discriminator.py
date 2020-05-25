@@ -12,8 +12,7 @@ from visualization import board_add_images
 import cv2
 import torch.nn as nn
 from resnet import Embedder
-from tryon_net import G
-from unet import VGGExtractor, Discriminator
+from unet import UNet, VGGExtractor, Discriminator, AccDiscriminator
 import torch.nn.init as init
 from tqdm import tqdm
 import torch.nn.functional as F
@@ -31,10 +30,8 @@ import utils
 SIZE = 320
 NC = 14
 
-lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
-# lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
-lambdas = {'adv': 0.1, 'identity': 1000, 'match_gt': 5, 'vis_reg': .5, 'consist': 50}
-
+lambdas_vis = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
+lambdas = {'adv': 0.25, 'adv_identity': 5, 'identity': 500, 'match_gt': 20, 'vis_reg': 1, 'consist': 50}
 
 def single_gpu_flag(args):
     return not args.distributed or (args.distributed and args.local_rank % torch.cuda.device_count() == 0)
@@ -120,6 +117,8 @@ def changearm(old_label):
 
 opt = TrainOptions().parse()
 
+os.makedirs(os.path.join("checkpoints", opt.name), exist_ok=True)
+
 iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
 if opt.continue_train:
     try:
@@ -140,9 +139,6 @@ if opt.debug:
 n_gpu = int(os.environ['WORLD_SIZE']) if 'WORLD_SIZE' in os.environ else 1
 opt.distributed = n_gpu > 1
 local_rank = opt.local_rank
-
-if single_gpu_flag(opt):
-    os.makedirs(os.path.join("checkpoints", opt.name), exist_ok=True)
 
 if opt.distributed:
     torch.cuda.set_device(opt.local_rank)
@@ -181,32 +177,37 @@ def save_checkpoint(model, save_path):
 if single_gpu_flag(opt):
     board = SummaryWriter(os.path.join('runs', opt.name))
 
-
 prev_model = create_model(opt)
 prev_model.cuda()
 
 
-embedder_model = Embedder()
-load_checkpoint(embedder_model, "../cp-vton/checkpoints/identity_train_64_dim/step_020000.pth")
-image_embedder = embedder_model.embedder_b.cuda()
-
-model = G()
+model = UNet(n_channels=4, n_classes=3)
+if opt.distributed:
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
 model.apply(weights_init('kaiming'))
 model.cuda()
+
 
 if opt.use_gan:
     discriminator = Discriminator()
     discriminator.apply(utils.weights_init('gaussian'))
     discriminator.cuda()
 
+    acc_discriminator = AccDiscriminator()
+    acc_discriminator.apply(utils.weights_init('gaussian'))
+    acc_discriminator.cuda()
+
 if not opt.checkpoint == '' and os.path.exists(opt.checkpoint):
     load_checkpoint(model, opt.checkpoint)
     if opt.use_gan:
         load_checkpoint(discriminator, opt.checkpoint.replace("step_", "step_disc_"))
+        load_checkpoint(acc_discriminator, opt.checkpoint.replace("step_", "step_acc_disc_"))
 
 model_module = model
 if opt.use_gan:
     discriminator_module = discriminator
+    acc_discriminator_module = acc_discriminator
+
 if opt.distributed:
     model = torch.nn.parallel.DistributedDataParallel(model,
                                                       device_ids=[local_rank],
@@ -219,14 +220,18 @@ if opt.distributed:
                                                                   output_device=local_rank,
                                                                   find_unused_parameters=True)
         discriminator_module = discriminator.module
+        acc_discriminator = torch.nn.parallel.DistributedDataParallel(acc_discriminator,
+                                                                      device_ids=[local_rank],
+                                                                      output_device=local_rank,
+                                                                      find_unused_parameters=True)
+        acc_discriminator_module = acc_discriminator.module
 
-image_embedder.eval()
 model.train()
 
 # optimizer
-optimizer = torch.optim.Adam(list(model.parameters()), lr=opt.lr, betas=(0.5, 0.999), weight_decay=1e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, betas=(0.5, 0.999))
 if opt.use_gan:
-    D_optim = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(0.5, 0.999), weight_decay=1e-4)
+    D_optim = torch.optim.Adam(list(discriminator.parameters()) + list(acc_discriminator.parameters()), lr=opt.lr, betas=(0.5, 0.999), weight_decay=1e-4)
 
 step = 0
 
@@ -267,67 +272,80 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
                 Variable(data['pose'].cuda()), Variable(data['image'].cuda()), Variable(mask_fore.cuda()))
 
             consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
+        gt = data['image'].cuda()
 
-        gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask
-        output_1 = model(transfer_1.detach(), gt_residual.detach())
-        output_2 = model(transfer_2.detach(), gt_residual.detach())
-
-        embedding_1 = image_embedder(output_1)
-        embedding_2 = image_embedder(output_2)
-        embedding_1_t = image_embedder(transfer_1)
-        embedding_2_t = image_embedder(transfer_2)
+        gt_residual = ((torch.mean(gt, dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask
+        output_1 = model(torch.cat([transfer_1, gt_residual.detach()], dim=1))
+        output_2 = model(torch.cat([transfer_2, gt_residual.detach()], dim=1))
 
         if opt.use_gan:
             # train discriminator
-            real_L_logit, real_L_cam_logit, real_G_logit, real_G_cam_logit = discriminator(F.interpolate(data['image'].cuda(), size=(256, 256), mode='bilinear'))
-            fake_L_logit_1, fake_L_cam_logit_1, fake_G_logit_1, fake_G_cam_logit_1 = discriminator(F.interpolate(output_1, size=(256, 256), mode='bilinear').detach())
-            fake_L_logit_2, fake_L_cam_logit_2, fake_G_logit_2, fake_G_cam_logit_2 = discriminator(F.interpolate(output_2, size=(256, 256), mode='bilinear').detach())
+            real_L_logit, real_L_cam_logit, real_G_logit, real_G_cam_logit = discriminator(gt)
+            fake_L_logit, fake_L_cam_logit, fake_G_logit, fake_G_cam_logit = discriminator(
+                torch.cat([output_1, output_2], 0).detach())
 
             D_true_loss = adv_criterion(real_L_logit, True) + \
-                     adv_criterion(real_G_logit, True) + \
-                     adv_criterion(real_L_cam_logit, True) + \
-                     adv_criterion(real_G_cam_logit, True)
-            D_fake_loss =  adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), False) + \
-                     adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), False) + \
-                     adv_criterion(torch.cat([fake_L_logit_1, fake_L_logit_2], dim=0), False) + \
-                     adv_criterion(torch.cat([fake_G_logit_1, fake_G_logit_2], dim=0), False)
+                          adv_criterion(real_G_logit, True) + \
+                          adv_criterion(real_L_cam_logit, True) + \
+                          adv_criterion(real_G_cam_logit, True)
+            D_fake_loss = adv_criterion(fake_L_cam_logit, False) + \
+                          adv_criterion(fake_G_cam_logit, False) + \
+                          adv_criterion(fake_L_logit, False) + \
+                          adv_criterion(fake_G_logit, False)
 
-            D_loss = D_true_loss + D_fake_loss
+            real_A_logit = acc_discriminator(transfer_1.detach(), output_1.detach())
+            fake_A_logit = acc_discriminator(transfer_2.detach(), output_2.detach())
+            D_A_loss = adv_criterion(real_A_logit, True) + adv_criterion(fake_A_logit, False)
+            D__loss = D_true_loss + D_fake_loss
+
+            D_loss = D__loss + D_A_loss
             D_optim.zero_grad()
             D_loss.backward()
             D_optim.step()
 
             # train generator
-            fake_L_logit_1, fake_L_cam_logit_1, fake_G_logit_1, fake_G_cam_logit_1 = discriminator(F.interpolate(output_1, size=(256, 256), mode='bilinear'))
-            fake_L_logit_2, fake_L_cam_logit_2, fake_G_logit_2, fake_G_cam_logit_2 = discriminator(F.interpolate(output_2, size=(256, 256), mode='bilinear'))
+            fake_L_logit, fake_L_cam_logit, fake_G_logit, fake_G_cam_logit = discriminator(
+                torch.cat([output_1, output_2], 0))
+            fake_A_logit = acc_discriminator(transfer_2, output_2)
 
-            G_adv_loss = adv_criterion(torch.cat([fake_L_logit_1, fake_L_logit_2], dim=0), True) + \
-                         adv_criterion(torch.cat([fake_G_logit_1, fake_G_logit_2], dim=0), True) + \
-                         adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), True) + \
-                         adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), True)
+            G_adv_loss = adv_criterion(fake_L_logit, True) + \
+                         adv_criterion(fake_G_logit, True) + \
+                         adv_criterion(fake_L_cam_logit, True) + \
+                         adv_criterion(fake_G_cam_logit, True)
+            G_adv_identity_loss = adv_criterion(fake_A_logit, True)
 
-        # identity loss
-        identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t)
-
-        # vis reg loss
         output_1_feats = vgg_extractor(output_1)
         transfer_1_feats = vgg_extractor(transfer_1)
+        gt_feats = vgg_extractor(gt)
         output_2_feats = vgg_extractor(output_2)
         transfer_2_feats = vgg_extractor(transfer_2)
-        gt_feats = vgg_extractor(data['image'].cuda())
 
+        l1_reg = l1_criterion(output_1, transfer_1) + l1_criterion(output_2, transfer_2)
         style_reg = utils.compute_style_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_style_loss(output_2_feats, transfer_2_feats, l1_criterion)
         perceptual_reg = utils.compute_perceptual_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_perceptual_loss(output_2_feats, transfer_2_feats, l1_criterion)
-        l1_reg = l1_criterion(output_1, transfer_1) + l1_criterion(output_2, transfer_2)
 
-        vis_reg_loss = l1_reg * lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
+        vis_reg_loss = l1_reg * lambdas_vis["l1"] + style_reg * lambdas_vis["style"] + perceptual_reg * lambdas_vis["prc"]
 
-        # match gt loss
-        match_gt_loss = l1_criterion(output_1, data['image'].cuda()) * lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
+        # match ground truth loss
+        match_gt_loss = l1_criterion(output_1, gt) * lambdas_vis["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis["prc"]
 
         # consistency loss
         consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)
 
+        total_loss = lambdas['match_gt'] * match_gt_loss + \
+                     lambdas['vis_reg'] * vis_reg_loss \
+
+        if not opt.no_consist:
+            total_loss += lambdas['consist'] * consistency_loss
+        # lambdas['identity'] * identity_loss + \
+
+        if opt.use_gan:
+            total_loss += lambdas['adv'] * G_adv_loss
+            total_loss += lambdas['adv_identity'] * G_adv_identity_loss
+
+        optimizer.zero_grad()
+        total_loss.backward()
+        optimizer.step()
 
         ### display output images
         seg_label_1 = generate_label_color(generate_label_plain(input_label)).float().cuda()
@@ -335,49 +353,34 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         prod_1_mask = torch.cat([clothes_mask, clothes_mask, clothes_mask], 1)
         prod_2 = prod_image_2.float().cuda()
 
-        total_loss = lambdas['identity'] * identity_loss + \
-                     lambdas['match_gt'] * match_gt_loss + \
-                     lambdas['vis_reg'] * vis_reg_loss + \
-                     lambdas['consist'] * consistency_loss
-
-        if opt.use_gan:
-            total_loss += lambdas['adv'] * G_adv_loss
-
-        optimizer.zero_grad()
-        total_loss.backward()
-        optimizer.step()
-
         if single_gpu_flag(opt):
 
             if (step + 1) % opt.display_freq == 0:
                 visuals = [[prod_1_mask.cpu(), torch.cat([clothes_mask_2, clothes_mask_2, clothes_mask_2], 1).cpu(),  data['image']],
                            [data['color'], data['color2'], torch.cat([gt_residual, gt_residual, gt_residual], dim=1)],
-                           [transfer_1, output_1, (output_1 - transfer_1)],
-                           [transfer_2, output_2, (output_2 - transfer_2)]]
-                # combine=c[0].squeeze()
-                # cv_img = (combine.permute(1, 2, 0).detach().cpu().numpy() + 1) / 2
-                # if step % 1 == 0:
-                #     writer.add_image('combine', (combine.data + 1) / 2.0, step)
-                #     rgb = (cv_img * 255).astype(np.uint8)
-                #     bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-                #     n = str(step) + '.jpg'
-                #     cv2.imwrite(tmp_img_dir + data['name'][0], bgr)
+                           [transfer_1, output_1, (output_1 - transfer_1) / 2],
+                           [transfer_2, output_2, (output_2 - transfer_2) / 2]]
+
                 board_add_images(board, str(step + 1), visuals, step + 1)
             board.add_scalar('loss/total', total_loss.item(), step + 1)
-            board.add_scalar('loss/identity', identity_loss.item(), step + 1)
             board.add_scalar('loss/vis_reg', vis_reg_loss.item(), step + 1)
             board.add_scalar('loss/match_gt', match_gt_loss.item(), step + 1)
-            board.add_scalar('loss/consist', consistency_loss.item(), step + 1)
+            if not opt.no_consist:
+                board.add_scalar('loss/consist', consistency_loss.item(), step + 1)
             if opt.use_gan:
-                board.add_scalar('loss/Dadv', D_loss.item(),  step + 1)
+                board.add_scalar('loss/Dadv', D__loss.item(),  step + 1)
+                board.add_scalar('loss/Dadv_id', D_A_loss.item(),  step + 1)
                 board.add_scalar('loss/Gadv', G_adv_loss.item(),  step + 1)
+                board.add_scalar('loss/Gadv_id', G_adv_identity_loss.item(),  step + 1)
 
-            pbar.set_description('step: %8d, loss: %.4f, identity: %.4f, vis_reg: %.4f, mse: %.4f, consist: %.4f'
-                  % (step + 1, total_loss.item(), identity_loss.item(),
-                     vis_reg_loss.item(), match_gt_loss.item(), consistency_loss.item()))
+            pbar.set_description('step: %8d, loss: %.4f, vis_reg: %.4f, match_gt: %.4f'
+                  % (step + 1, total_loss.item(),
+                     vis_reg_loss.item(), match_gt_loss.item()))
 
         if (step+1) % opt.save_count == 0 and single_gpu_flag(opt):
             save_checkpoint(model_module, os.path.join("checkpoints", opt.name, 'step_%06d.pth' % (step + 1)))
             if opt.use_gan:
                 save_checkpoint(discriminator_module, os.path.join("checkpoints", opt.name, 'step_disc_%06d.pth' % (step + 1)))
+                save_checkpoint(acc_discriminator_module, os.path.join("checkpoints", opt.name, 'step_acc_disc_%06d.pth' % (step + 1)))
+
         step += 1
