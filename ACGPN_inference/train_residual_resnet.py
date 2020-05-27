@@ -32,8 +32,8 @@ SIZE = 320
 NC = 14
 
 lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
+lambdas = {'adv': 0.1, 'identity': 100, 'match_gt': 50, 'vis_reg': .5, 'consist': 50}
 # lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
-lambdas = {'adv': 0.1, 'identity': 1000, 'match_gt': 5, 'vis_reg': .5, 'consist': 50}
 
 
 def single_gpu_flag(args):
@@ -156,10 +156,6 @@ print('#training images = %d' % dataset_size)
 
 total_steps = (start_epoch - 1) * dataset_size + epoch_iter
 
-display_delta = total_steps % opt.display_freq
-print_delta = total_steps % opt.print_freq
-save_delta = total_steps % opt.save_latest_freq
-
 l1_criterion = nn.L1Loss()
 mse_criterion = nn.MSELoss()
 vgg_extractor = VGGExtractor().cuda().eval()
@@ -187,7 +183,7 @@ prev_model.cuda()
 
 
 embedder_model = Embedder()
-load_checkpoint(embedder_model, "../cp-vton/checkpoints/identity_train_64_dim/step_020000.pth")
+load_checkpoint(embedder_model, "../../cp-vton/checkpoints/identity_train_64_dim/step_020000.pth")
 image_embedder = embedder_model.embedder_b.cuda()
 
 model = G()
@@ -323,7 +319,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         vis_reg_loss = l1_reg * lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
 
         # match gt loss
-        match_gt_loss = l1_criterion(output_1, data['image'].cuda()) * lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
+        match_gt_loss = mse_criterion(output_1, data['image'].cuda()) #* lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
 
         # consistency loss
         consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)

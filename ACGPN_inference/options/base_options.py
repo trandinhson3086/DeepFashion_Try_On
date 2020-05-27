@@ -18,6 +18,9 @@ class BaseOptions():
         self.parser.add_argument('--use_dropout', action='store_true', help='use dropout for the generator')
         self.parser.add_argument('--data_type', default=32, type=int, choices=[8, 16, 32], help="Supported data type i.e. 8, 16, 32 bit")
         self.parser.add_argument('--verbose', action='store_true', default=False, help='toggles verbose')
+        self.parser.add_argument('--load_pretrain', type=str, default='./checkpoints/label2city',
+                                 help='load the pretrained model from the specified location')
+        self.parser.add_argument('--use_gan', action='store_true', default=True, help='toggles verbose')
 
         # input/output sizes       
         self.parser.add_argument('--batchSize', type=int, default=1, help='input batch size')
@@ -32,7 +35,7 @@ class BaseOptions():
         self.parser.add_argument('--resize_or_crop', type=str, default='scale_width', help='scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop]')
         self.parser.add_argument('--serial_batches', action='store_true', help='if true, takes images in order to make batches, otherwise takes them randomly')        
         self.parser.add_argument('--no_flip', action='store_true', help='if specified, do not flip the images for data argumentation') 
-        self.parser.add_argument('--nThreads', default=2, type=int, help='# threads for loading data')                
+        self.parser.add_argument('--nThreads', default=24, type=int, help='# threads for loading data')
         self.parser.add_argument('--max_dataset_size', type=int, default=float("inf"), help='Maximum number of samples allowed per dataset. If the dataset directory contains more than max_dataset_size, only a subset is loaded.')
 
         # for displays
@@ -46,7 +49,9 @@ class BaseOptions():
         self.parser.add_argument('--n_blocks_global', type=int, default=4, help='number of residual blocks in the global generator network')
         self.parser.add_argument('--n_blocks_local', type=int, default=3, help='number of residual blocks in the local enhancer network')
         self.parser.add_argument('--n_local_enhancers', type=int, default=1, help='number of local enhancers to use')        
-        self.parser.add_argument('--niter_fix_global', type=int, default=0, help='number of epochs that we only train the outmost local enhancer')        
+        self.parser.add_argument('--niter_fix_global', type=int, default=0, help='number of epochs that we only train the outmost local enhancer')
+        self.parser.add_argument('--data_list', type=str, default=None, help='selects model to use for netG')
+
 
         self.initialized = True
 

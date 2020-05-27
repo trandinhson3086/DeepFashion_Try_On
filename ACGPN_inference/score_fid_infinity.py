@@ -415,7 +415,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    root_path = "test_files_dir/rablation-no-identity/"
+    root_path = "test_files_dir/residual_resnet_010000/"
     paths = ["baseline", "refined"]
 
     for path in paths:

@@ -3,9 +3,12 @@
   <component name="ChangeListManager">
     <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/models/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/models/models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/models/pix2pixHD_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/models/pix2pixHD_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/data/aligned_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/data/aligned_dataset.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/options/base_options.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/options/base_options.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/options/train_options.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/options/train_options.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -49,7 +52,7 @@
       <updated>1590305738237</updated>
       <workItem from="1590305739385" duration="8913000" />
       <workItem from="1590363228523" duration="5339000" />
-      <workItem from="1590386070024" duration="2643000" />
+      <workItem from="1590386070024" duration="25725000" />
     </task>
     <servers />
   </component>
@@ -61,13 +64,17 @@
       <screen x="0" y="23" width="2560" height="1417" />
     </state>
     <state x="862" y="307" key="#Deployment/0.23.2560.1417@0.23.2560.1417" timestamp="1590363412987" />
+    <state x="1136" y="290" width="670" height="676" key="search.everywhere.popup" timestamp="1590548000331">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state x="1136" y="290" width="670" height="676" key="search.everywhere.popup/0.23.2560.1417@0.23.2560.1417" timestamp="1590548000331" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py</url>
-          <line>312</line>
+          <line>308</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>

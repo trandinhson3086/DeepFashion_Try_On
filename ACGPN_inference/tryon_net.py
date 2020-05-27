@@ -4,8 +4,6 @@ import torchvision
 from torch import nn
 import torch
 import torch.nn.functional as F
-import unet
-
 
 class ResBlocks(nn.Module):
     def __init__(self, num_blocks, dim, norm='in', activation='relu', pad_type='zero'):
