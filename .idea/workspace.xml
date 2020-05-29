@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/data/aligned_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/data/aligned_dataset.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/options/base_options.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/options/base_options.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/options/train_options.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/options/train_options.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" afterDir="false" />
-    </list>
+    <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
