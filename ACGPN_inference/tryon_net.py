@@ -301,4 +301,5 @@ class Discriminator(nn.Module):
 
 
     def forward(self, input):
+        input = F.interpolate(input, size=(256,256), mode='bilinear')
         return self.model(input)
