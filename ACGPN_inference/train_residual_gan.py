@@ -266,9 +266,12 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
 
             consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
-        gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask
-        output_1 = model(transfer_1.detach(), gt_residual.detach())
-        output_2 = model(transfer_2.detach(), gt_residual.detach())
+        gt = data['image'].cuda()
+        gt_residual = (((torch.mean(gt, dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask).detach()
+        output_1 = model(transfer_1, gt_residual)
+        output_2 = model(transfer_2, gt_residual)
+        output_residual_1 = (output_1.mean(1) - transfer_1.mean(1)).unsqueeze(1)
+        output_residual_2 = (output_2.mean(1) - transfer_2.mean(1)).unsqueeze(1)
 
         embedding_1 = image_embedder(output_1)
         embedding_2 = image_embedder(output_2)
@@ -277,18 +280,12 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
 
         if opt.use_gan:
             # train discriminator
-            real_L_logit, real_L_cam_logit, real_G_logit, real_G_cam_logit = discriminator(F.interpolate(data['image'].cuda(), size=(256, 256), mode='bilinear'))
-            fake_L_logit_1, fake_L_cam_logit_1, fake_G_logit_1, fake_G_cam_logit_1 = discriminator(F.interpolate(output_1, size=(256, 256), mode='bilinear').detach())
-            fake_L_logit_2, fake_L_cam_logit_2, fake_G_logit_2, fake_G_cam_logit_2 = discriminator(F.interpolate(output_2, size=(256, 256), mode='bilinear').detach())
+            real_logit = discriminator(gt_residual)
+            fake_logit_1 = discriminator(output_residual_1.detach())
+            fake_logit_2 = discriminator(output_residual_2.detach())
 
-            D_true_loss = adv_criterion(real_L_logit, True) + \
-                     adv_criterion(real_G_logit, True) + \
-                     adv_criterion(real_L_cam_logit, True) + \
-                     adv_criterion(real_G_cam_logit, True)
-            D_fake_loss =  adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), False) + \
-                     adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), False) + \
-                     adv_criterion(torch.cat([fake_L_logit_1, fake_L_logit_2], dim=0), False) + \
-                     adv_criterion(torch.cat([fake_G_logit_1, fake_G_logit_2], dim=0), False)
+            D_true_loss = adv_criterion(real_logit, True)
+            D_fake_loss =  adv_criterion(torch.cat([fake_logit_1, fake_logit_2], 0), False)
 
             D_loss = D_true_loss + D_fake_loss
             D_optim.zero_grad()
@@ -296,13 +293,10 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             D_optim.step()
 
             # train generator
-            fake_L_logit_1, fake_L_cam_logit_1, fake_G_logit_1, fake_G_cam_logit_1 = discriminator(F.interpolate(output_1, size=(256, 256), mode='bilinear'))
-            fake_L_logit_2, fake_L_cam_logit_2, fake_G_logit_2, fake_G_cam_logit_2 = discriminator(F.interpolate(output_2, size=(256, 256), mode='bilinear'))
+            fake_logit_1 = discriminator(output_residual_1)
+            fake_logit_2 = discriminator(output_residual_2)
 
-            G_adv_loss = adv_criterion(torch.cat([fake_L_logit_1, fake_L_logit_2], dim=0), True) + \
-                         adv_criterion(torch.cat([fake_G_logit_1, fake_G_logit_2], dim=0), True) + \
-                         adv_criterion(torch.cat([fake_L_cam_logit_1, fake_L_cam_logit_2], dim=0), True) + \
-                         adv_criterion(torch.cat([fake_G_cam_logit_1, fake_G_cam_logit_2], dim=0), True)
+            G_adv_loss = adv_criterion(torch.cat([fake_logit_1, fake_logit_2], 0), True)
 
         # identity loss
         identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t)
@@ -321,7 +315,7 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         vis_reg_loss = l1_reg #* lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
 
         # match gt loss
-        match_gt_loss = l1_criterion(output_1, data['image'].cuda()) #* lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
+        match_gt_loss = l1_criterion(output_1, gt) #* lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
 
         # consistency loss
         consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)

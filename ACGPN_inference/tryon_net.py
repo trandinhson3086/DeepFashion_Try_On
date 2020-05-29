@@ -283,14 +283,10 @@ class Discriminator(nn.Module):
     def __init__(self, ndf=64):
         super().__init__()
         self.ndf = ndf
-        self.local_conv, self.local_cam, self.local_last = self.build_disc(True)
-        self.global_conv, self.global_cam, self.global_last = self.build_disc(False)
-
-    def build_disc(self, is_local):
-        n_layers = 5 if is_local else 8
+        n_layers = 8
 
         model = [nn.ReflectionPad2d(1),
-                 spectral_norm(nn.Conv2d(3, self.ndf, kernel_size=4, stride=2, padding=0, bias=True)),
+                 spectral_norm(nn.Conv2d(1, self.ndf, kernel_size=4, stride=2, padding=0, bias=True)),
                  nn.LeakyReLU(0.2, True)]
 
         for i in range(1, n_layers - 2):
@@ -300,55 +296,10 @@ class Discriminator(nn.Module):
                       nn.LeakyReLU(0.2, True)]
 
         mult = 2 ** (n_layers - 2 - 1)
-        model = nn.Sequential(*model)
-        cam = CAM(self.ndf*mult, is_disc=True)
-        last_conv = spectral_norm(nn.Conv2d(self.ndf*mult, 1, 4, padding=0, stride=1, bias=False))
+        model += [spectral_norm(nn.Conv2d(self.ndf*mult, 1, 4, padding=0, stride=1, bias=False))]
+        self.model = nn.Sequential(*model)
 
-        return model, cam, last_conv
-
-    def get_feat(self, input, conv, cam, conv_last):
-        feats = conv(input)
-        cam_output, cam_logit = cam(feats)
-        output = conv_last(cam_output)
-        return output, cam_logit
 
     def forward(self, input):
-        local, local_cam_logit = self.get_feat(input, self.local_conv, self.local_cam, self.local_last)
-        glob, glob_cam_logit = self.get_feat(input, self.global_conv, self.global_cam, self.global_last)
-        return local, local_cam_logit, glob, glob_cam_logit
-
-class CAM(nn.Module):
-    def __init__(self, in_channel, is_disc=True):
-        super().__init__()
-
-        # Class Activation Map
-        self.gap_fc = nn.Linear(in_channel, 1, bias=False)
-        self.gmp_fc = nn.Linear(in_channel, 1, bias=False)
-        self.conv1x1 = nn.Conv2d(in_channel * 2, in_channel, kernel_size=1, stride=1, bias=True)
-        if is_disc:
-            self.gap_fc = spectral_norm(self.gap_fc)
-            self.gmp_fc = spectral_norm(self.gmp_fc)
-            self.conv1x1 = spectral_norm(self.conv1x1)
-            self.activation = nn.LeakyReLU(0.2, True)
-        else:
-            self.activation = nn.ReLU(True)
-
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
-        self.maxpool = nn.AdaptiveMaxPool2d(1)
-
-    def forward(self, x):
-        gap = self.avgpool(x)
-        gap_logit = self.gap_fc(gap.view(x.shape[0], -1))
-        gap_weight = list(self.gap_fc.parameters())[0]
-        gap = x * gap_weight.unsqueeze(2).unsqueeze(3)
-
-        gmp = self.maxpool(x)
-        gmp_logit = self.gmp_fc(gmp.view(x.shape[0], -1))
-        gmp_weight = list(self.gmp_fc.parameters())[0]
-        gmp = x * gmp_weight.unsqueeze(2).unsqueeze(3)
-
-        cam_logit = torch.cat([gap_logit, gmp_logit], 1)
-        x = torch.cat([gap, gmp], 1)
-        x = self.activation(self.conv1x1(x))
-
-        return x, cam_logit
+        input = F.interpolate(input, size=(256,256), mode='bilinear')
+        return self.model(input)
