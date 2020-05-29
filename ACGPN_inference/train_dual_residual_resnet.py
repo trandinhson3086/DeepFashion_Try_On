@@ -33,9 +33,7 @@ NC = 14
 
 lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
 # lambdas = {'adv': 0.1, 'identity': 100, 'match_gt': 50, 'vis_reg': .5, 'consist': 50}
-# lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
-# lambdas = {'adv': 0.1, 'identity': 500, 'match_gt': 50, 'vis_reg': .1, 'consist': 50}
-lambdas = {'adv': 0.1, 'identity': 500, 'match_gt': 50, 'vis_reg': .1, 'consist': 50}
+lambdas = {'adv': 0.1, 'identity': 200, 'match_gt': 50, 'vis_reg': .1, 'consist': 50}
 
 
 def single_gpu_flag(args):
@@ -188,7 +186,7 @@ embedder_model = Embedder()
 load_checkpoint(embedder_model, "../../cp-vton/checkpoints/identity_train_64_dim/step_020000.pth")
 image_embedder = embedder_model.embedder_b.cuda()
 
-model = G()
+model = G(input_dim=7)
 model.apply(weights_init('kaiming'))
 model.cuda()
 
@@ -267,8 +265,8 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
         gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask
-        output_1 = model(transfer_1.detach(), gt_residual.detach())
-        output_2 = model(transfer_2.detach(), gt_residual.detach())
+        output_1 = model(transfer_1.detach(), torch.cat([gt_residual.detach(), (transfer_1 - transfer_1).detach()], dim=1))
+        output_2 = model(transfer_2.detach(), torch.cat([gt_residual.detach(), (transfer_2 - transfer_1).detach()], dim=1))
 
         embedding_1 = image_embedder(output_1)
         embedding_2 = image_embedder(output_2)
@@ -312,16 +310,16 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
         transfer_1_feats = vgg_extractor(transfer_1)
         output_2_feats = vgg_extractor(output_2)
         transfer_2_feats = vgg_extractor(transfer_2)
-        # gt_feats = vgg_extractor(data['image'].cuda())
+        gt_feats = vgg_extractor(data['image'].cuda())
 
         style_reg = utils.compute_style_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_style_loss(output_2_feats, transfer_2_feats, l1_criterion)
         perceptual_reg = utils.compute_perceptual_loss(output_1_feats, transfer_1_feats, l1_criterion) + utils.compute_perceptual_loss(output_2_feats, transfer_2_feats, l1_criterion)
         l1_reg = l1_criterion(output_1, transfer_1) + l1_criterion(output_2, transfer_2)
 
-        vis_reg_loss = l1_reg #* lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
+        vis_reg_loss = l1_reg * lambdas_vis_reg["l1"] + style_reg * lambdas_vis_reg["style"] + perceptual_reg * lambdas_vis_reg["prc"]
 
         # match gt loss
-        match_gt_loss = l1_criterion(output_1, data['image'].cuda()) #* lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
+        match_gt_loss = mse_criterion(output_1, data['image'].cuda()) #* lambdas_vis_reg["l1"] + utils.compute_style_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["style"] + utils.compute_perceptual_loss(output_1_feats, gt_feats, l1_criterion) * lambdas_vis_reg["prc"]
 
         # consistency loss
         consistency_loss = mse_criterion(transfer_1 - output_1, transfer_2 - output_2)

@@ -175,7 +175,7 @@ prev_model = create_model(opt)
 prev_model.cuda()
 
 embedder_model = Embedder()
-load_checkpoint(embedder_model, "../../cp-vton/checkpoints/identity_train_64_dim/step_020000.pth")
+load_checkpoint(embedder_model, "../../cp-vton/checkpoints/identity_embedding_for_test/step_045000.pth")
 image_embedder = embedder_model.embedder_b.cuda()
 image_embedder.eval()
 
@@ -208,6 +208,7 @@ total_length_gt = 0
 
 product_embeddings = []
 outfit_embeddings = []
+transfer_embeddings = []
 
 product_embeddings_gt = []
 outfit_embeddings_gt = []
@@ -252,9 +253,12 @@ for i, data in pbar:
             return torch.stack(tensors)
 
         embedding_o = image_embedder(output_1).cpu()
+        embedding_t = image_embedder(transfer_1).cpu()
         embedding_p = prod_embedder(data['color'].cuda()).cpu()
+
         product_embeddings.append(embedding_p)
         outfit_embeddings.append(embedding_o)
+        transfer_embeddings.append(embedding_t)
 
         total_length += torch.sum(embedding_mse(mse_criterion, embedding_o, embedding_p)).cpu()
 
@@ -266,6 +270,7 @@ for i, data in pbar:
 
 product_embeddings = torch.cat(product_embeddings, dim=0).numpy()
 outfit_embeddings = torch.cat(outfit_embeddings, dim=0).numpy()
+transfer_embeddings = torch.cat(transfer_embeddings, dim=0).numpy()
 
 product_embeddings_gt = torch.cat(product_embeddings_gt, dim=0).numpy()
 outfit_embeddings_gt = torch.cat(outfit_embeddings_gt, dim=0).numpy()
@@ -283,6 +288,24 @@ def get_correct_count(outfit_embeddings, product_embeddings, top_k=5):
             correct_count += 1
     return correct_count
 
+def get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings):
+    correct_count = 0
+
+    for i in tqdm(range(outfit_embeddings.shape[0])):
+
+        scores_o = []
+        for j in range(product_embeddings.shape[0]):
+            scores_o.append(distance.euclidean(outfit_embeddings[i], product_embeddings[j]))
+        sort_index_o = np.argsort(scores_o).tolist()
+
+        scores_t = []
+        for j in range(product_embeddings.shape[0]):
+            scores_t.append(distance.euclidean(transfer_embeddings[i], product_embeddings[j]))
+        sort_index_t = np.argsort(scores_t).tolist()
+        if sort_index_o[0] == sort_index_t[0]:
+            correct_count += 1
+    return correct_count
+
 # def build_tree(vectors, dim=64):
 #     a = AnnoyIndex(dim, 'euclidean')
 #     for i, v in enumerate(vectors):
@@ -292,13 +315,15 @@ def get_correct_count(outfit_embeddings, product_embeddings, top_k=5):
 #
 # product_tree = build_tree(product_embeddings)
 
-correct_count = get_correct_count(outfit_embeddings, product_embeddings)
-correct_count_gt = get_correct_count(outfit_embeddings_gt, product_embeddings_gt)
+correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings)
 print("acc", correct_count, correct_count / dataset_size)
+print("identity", total_length / dataset_size)
+
+correct_count_gt = get_correct_count(outfit_embeddings_gt, product_embeddings_gt)
+
+print("identity gt", total_length_gt / dataset_size)
 print("acc_gt", correct_count_gt , correct_count_gt / dataset_size)
 
-print("identity", total_length / dataset_size)
-print("identity gt", total_length_gt / dataset_size)
 
 
 

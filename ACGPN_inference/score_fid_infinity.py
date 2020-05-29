@@ -67,7 +67,7 @@ class randn_sampler():
                 return self.sampler.draw(batch_size)
 
 
-def calculate_FID_infinity(gen_model, ndim, batch_size, gt_path, num_im=50000, num_points=15):
+def calculate_FID_infinity(dataloader, gt_m, gt_s, batch_size, num_points=15):
     """
     Calculates effectively unbiased FID_inf using extrapolation
     Args:
@@ -90,23 +90,20 @@ def calculate_FID_infinity(gen_model, ndim, batch_size, gt_path, num_im=50000, n
     # load pretrained inception model
     inception_model = load_inception_net()
 
-    # define a sobol_inv sampler
-    z_sampler = randn_sampler(ndim, True)
-
     # get all activations of generated images
-    activations, _ = accumulate_activations(gen_model, inception_model, num_im, z_sampler, batch_size)
+    activations = get_activations(dataloader, inception_model).cpu().numpy()
 
     fids = []
 
     # Choose the number of images to evaluate FID_N at regular intervals over N
-    fid_batches = np.linspace(5000, num_im, num_points).astype('int32')
+    fid_batches = np.linspace(5000, len(dataloader), num_points).astype('int32')
 
     # Evaluate FID_N
     for fid_batch_size in fid_batches:
         # sample with replacement
         np.random.shuffle(activations)
         fid_activations = activations[:fid_batch_size]
-        fids.append(calculate_FID(inception_model, fid_activations, gt_path))
+        fids.append(calculate_FID(fid_activations, gt_m, gt_s))
     fids = np.array(fids).reshape(-1, 1)
 
     # Fit linear regression
@@ -168,10 +165,9 @@ class im_dataset(Dataset):
     def __init__(self, data_dir):
         self.data_dir = data_dir
         self.imgpaths = self.get_imgpaths()
+        print(self.data_dir)
 
         self.transform = transforms.Compose([
-            transforms.Resize(64),
-            transforms.CenterCrop(64),
             transforms.ToTensor()])
 
     def get_imgpaths(self):
@@ -209,7 +205,8 @@ def compute_path_statistics(path, batch_size):
         raise RuntimeError('Invalid path: %s' % path)
 
     model = load_inception_net()
-    dataloader = torch.utils.data.DataLoader(im_dataset(path), batch_size=batch_size, drop_last=False, **{'num_workers': 8, 'pin_memory': False})
+    dataloader = torch.utils.data.DataLoader(im_dataset(path), batch_size=batch_size, drop_last=False,
+                                             **{'num_workers': 8, 'pin_memory': False})
     act = get_activations(dataloader, model).cpu().numpy()
     m, s = np.mean(act, axis=0), np.cov(act, rowvar=False)
     return m, s
@@ -231,11 +228,10 @@ def get_activations(dataloader, model):
 
 
 ####################### Functions to help calculate FID and IS #######################
-def calculate_FID(model, act, gt_npz):
+def calculate_FID(act, data_m, data_s):
     """
     calculate score given activations and path to npz
     """
-    data_m, data_s = load_path_statistics(gt_npz)
     gen_m, gen_s = np.mean(act, axis=0), np.cov(act, rowvar=False)
     FID = numpy_calculate_frechet_distance(gen_m, gen_s, data_m, data_s)
 
@@ -410,18 +406,26 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--batch-size', type=int, default=256,
+    parser.add_argument('--experiment-count', type=int, default=10,
+                        help='Batch size to use')
+    parser.add_argument('--batch-size', type=int, default=128,
                         help='Batch size to use')
 
     args = parser.parse_args()
 
-    root_path = "test_files_dir/residual_resnet_010000/"
-    paths = ["baseline", "refined"]
+    root_path = "test_files_dir/resnet_mse_l1_14000/"
+    paths = ["refined"]
+
+    data_m, data_s = compute_path_statistics("../../cp-vton/test_files_dir/GMM/gt", args.batch_size)
 
     for path in paths:
-        gen_m, gen_s = compute_path_statistics(root_path + path, args.batch_size)
-        data_m, data_s = compute_path_statistics("../../cp-vton/test_files_dir/GMM/gt", args.batch_size)
-        # data_m, data_s = compute_path_statistics(root_path + "gt", args.batch_size)
-
-        FID = numpy_calculate_frechet_distance(gen_m, gen_s, data_m, data_s)
-        print("FID inf", FID)
+        dataloader = torch.utils.data.DataLoader(im_dataset(root_path + path),
+                                                 batch_size=args.batch_size,
+                                                 drop_last=False, **{'num_workers': 8, 'pin_memory': False})
+        FIDS = []
+        for i in range(args.experiment_count):
+            FID = calculate_FID_infinity(dataloader, data_m, data_s, args.batch_size)
+            print("FID inf", FID)
+            FIDS.append(FID)
+        FIDS = np.array(FIDS)
+        print(np.mean(FIDS), np.std(FIDS))

@@ -242,8 +242,6 @@ for i, data in pbar:
     output_residual = torch.cat([normalize(gt_residual), normalize(gt_residual), normalize(gt_residual)], dim=1).cpu()
 
     for b_i in range(transfer_1.shape[0]):
-        save_image(normalize(data['image'][b_i]),
-                   os.path.join(test_files_dir, "gt", str(i * opt.batch_size + b_i) + ".jpg"))
         save_image(normalize(transfer_1[b_i].cpu()),
                    os.path.join(test_files_dir, "baseline", str(i * opt.batch_size + b_i) + ".jpg"))
         save_image(normalize(output_residual)[b_i],

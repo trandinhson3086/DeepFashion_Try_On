@@ -201,11 +201,12 @@ class VGGExtractor(torch.nn.Module):
         return output
 
 class G(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim=4):
         super().__init__()
         # self.final = unet.UNet(6, 3)
-        self.encoder = ContentEncoder(input_dim=4)
+        self.encoder = ContentEncoder(input_dim=input_dim)
         self.decoder = Decoder(dim=self.encoder.output_dim)
+
     def forward(self, input, residual):
         ip = torch.cat([input, residual], dim=1)
         output = self.decoder(self.encoder(ip))
