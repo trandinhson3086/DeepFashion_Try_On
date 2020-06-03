@@ -182,7 +182,7 @@ image_embedder.eval()
 prod_embedder = embedder_model.embedder_a.cuda()
 prod_embedder.eval()
 
-model = G()
+model = G(input_dim=22)
 model.cuda()
 
 if not opt.checkpoint == '' and os.path.exists(opt.checkpoint):
@@ -242,8 +242,8 @@ for i, data in pbar:
         consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
         gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_2, dim=1)).unsqueeze(1)) * consistent_mask
-        output_1 = model(transfer_1.detach(), gt_residual.detach())
-        output_2 = model(transfer_2.detach(), gt_residual.detach())
+        output_1 = model(transfer_1.detach(), torch.cat([gt_residual.detach(), data['pose'].cuda()], dim=1))
+        output_2 = model(transfer_2.detach(), torch.cat([gt_residual.detach(), data['pose'].cuda()], dim=1))
 
         def embedding_mse(mse_criterion, e1, e2):
             tensors = []
@@ -287,7 +287,7 @@ def get_correct_count(outfit_embeddings, product_embeddings, top_k=5):
             correct_count += 1
     return correct_count
 
-def get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings, top_k=1):
+def get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings):
     correct_count = 0
 
     for i in tqdm(range(outfit_embeddings.shape[0])):
@@ -301,7 +301,8 @@ def get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embe
         for j in range(product_embeddings.shape[0]):
             scores_t.append(distance.euclidean(transfer_embeddings[i], product_embeddings[j]))
         sort_index_t = np.argsort(scores_t).tolist()
-        correct_count += len(set(sort_index_o[0: top_k]).intersection(set(sort_index_t[0: top_k]))) / top_k
+        if sort_index_o[0] == sort_index_t[0]:
+            correct_count += 1
     return correct_count
 
 # def build_tree(vectors, dim=64):
@@ -313,13 +314,11 @@ def get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embe
 #
 # product_tree = build_tree(product_embeddings)
 
-correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings, top_k=1)
-print("acc 1", correct_count, correct_count / dataset_size)
-correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings, top_k=5)
-print("acc 5", correct_count, correct_count / dataset_size)
+correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings)
+print("acc", correct_count, correct_count / dataset_size)
 print("identity", total_length / dataset_size)
 
-correct_count_gt = get_correct_count(outfit_embeddings_gt, product_embeddings_gt, top_k=1)
+correct_count_gt = get_correct_count(outfit_embeddings_gt, product_embeddings_gt)
 
 print("identity gt", total_length_gt / dataset_size)
 print("acc_gt", correct_count_gt , correct_count_gt / dataset_size)

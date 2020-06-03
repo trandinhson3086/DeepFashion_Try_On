@@ -266,7 +266,6 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
 
             consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
-        print(data['pose'].cuda().shape, transfer_1.shape)
         gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask
         output_1 = model(transfer_1.detach(), torch.cat([gt_residual.detach(), data['pose'].cuda()], dim=1))
         output_2 = model(transfer_2.detach(), torch.cat([gt_residual.detach(), data['pose'].cuda()], dim=1))

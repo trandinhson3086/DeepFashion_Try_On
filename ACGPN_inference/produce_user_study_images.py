@@ -12,12 +12,14 @@ import cv2
 import torch.nn as nn
 from resnet import Embedder
 from unet import UNet, VGGExtractor, Discriminator
+from tryon_net import G
 import torch.nn.init as init
 from tqdm import tqdm
 import torch.nn.functional as F
 from torchvision.utils import save_image
-from tryon_net import G
-from scipy.spatial import distance
+from torchvision.utils import make_grid
+from visualization import tensor_list_for_board
+
 from distributed import (
     get_rank,
     synchronize,
@@ -26,7 +28,6 @@ from distributed import (
     get_world_size,
 )
 import utils
-from annoy import AnnoyIndex
 
 def normalize(x):
     x = ((x+1)/2).clamp(0,1)
@@ -36,7 +37,7 @@ SIZE = 320
 NC = 14
 
 lambdas_vis_reg = {'l1': 1.0, 'prc': 0.05, 'style': 100.0}
-lambdas = {'adv': 0.25, 'identity': 100, 'mse': 50, 'vis_reg': .5, 'consist': 50}
+lambdas = {'adv': 0.25, 'identity': 500, 'mse': 50, 'vis_reg': .5, 'consist': 50}
 
 def generate_label_plain(inputs):
     size = inputs.size()
@@ -147,6 +148,7 @@ if opt.distributed:
     torch.distributed.init_process_group(backend='nccl', init_method='env://')
     synchronize()
 
+opt.batchSize = 16
 dataset = AlignedDataset()
 dataset.initialize(opt)
 
@@ -155,7 +157,7 @@ data_loader = torch.utils.data.DataLoader(
     batch_size=opt.batchSize,
     shuffle=False,
     num_workers=int(opt.nThreads))
-dataset_size = len(dataset)
+dataset_size = len(data_loader)
 print('#training images = %d' % dataset_size)
 
 total_steps = (start_epoch - 1) * dataset_size + epoch_iter
@@ -168,19 +170,13 @@ adv_criterion = utils.AdversarialLoss('lsgan').cuda()
 opt.batch_size = opt.batchSize
 
 def load_checkpoint(model, checkpoint_path):
+    if not os.path.exists(checkpoint_path):
+        return
     model.load_state_dict(torch.load(checkpoint_path))
     model.cuda()
 
 prev_model = create_model(opt)
 prev_model.cuda()
-
-embedder_model = Embedder()
-load_checkpoint(embedder_model, "../../cp-vton/checkpoints/identity_embedding_for_test/step_045000.pth")
-image_embedder = embedder_model.embedder_b.cuda()
-image_embedder.eval()
-
-prod_embedder = embedder_model.embedder_a.cuda()
-prod_embedder.eval()
 
 model = G()
 model.cuda()
@@ -192,25 +188,10 @@ model.eval()
 
 step = 0
 
-test_files_dir = "test_files_dir/" + opt.name
+test_files_dir = "result_files_dir/" + opt.name
 os.makedirs(test_files_dir, exist_ok=True)
-os.makedirs(os.path.join(test_files_dir, "gt"), exist_ok=True)
-os.makedirs(os.path.join(test_files_dir, "residual"), exist_ok=True)
-os.makedirs(os.path.join(test_files_dir, "baseline"), exist_ok=True)
-os.makedirs(os.path.join(test_files_dir, "refined"), exist_ok=True)
-os.makedirs(os.path.join(test_files_dir, "diff"), exist_ok=True)
 
 pbar = tqdm(enumerate(data_loader), total=len(data_loader))
-
-total_length = 0
-total_length_gt = 0
-
-product_embeddings = []
-outfit_embeddings = []
-transfer_embeddings = []
-
-product_embeddings_gt = []
-outfit_embeddings_gt = []
 
 for i, data in pbar:
     iter_start_time = time.time()
@@ -245,85 +226,13 @@ for i, data in pbar:
         output_1 = model(transfer_1.detach(), gt_residual.detach())
         output_2 = model(transfer_2.detach(), gt_residual.detach())
 
-        def embedding_mse(mse_criterion, e1, e2):
-            tensors = []
-            for i in range(e1.shape[0]):
-                tensors.append(mse_criterion(e1[i], e2[i]))
-            return torch.stack(tensors)
+    ### display output images
+    seg_label_1 = generate_label_color(generate_label_plain(input_label)).float().cuda()
+    prod_1 = prod_image.float().cuda()
+    prod_1_mask = torch.cat([clothes_mask, clothes_mask, clothes_mask], 1)
+    prod_2 = prod_image_2.float().cuda()
 
-        embedding_o = image_embedder(output_1).cpu()
-        embedding_t = image_embedder(transfer_1).cpu()
-        embedding_p = prod_embedder(data['color'].cuda()).cpu()
-
-        product_embeddings.append(embedding_p)
-        outfit_embeddings.append(embedding_o)
-        transfer_embeddings.append(embedding_t)
-
-        total_length += torch.sum(embedding_mse(mse_criterion, embedding_o, embedding_p)).cpu()
-
-        embedding_o = image_embedder(data['image'].cuda()).cpu()
-        embedding_p = prod_embedder(data['color2'].cuda()).cpu()
-        product_embeddings_gt.append(embedding_p)
-        outfit_embeddings_gt.append(embedding_o)
-        total_length_gt += torch.sum(embedding_mse(mse_criterion, embedding_o, embedding_p)).cpu()
-
-product_embeddings = torch.cat(product_embeddings, dim=0).numpy()
-outfit_embeddings = torch.cat(outfit_embeddings, dim=0).numpy()
-transfer_embeddings = torch.cat(transfer_embeddings, dim=0).numpy()
-
-product_embeddings_gt = torch.cat(product_embeddings_gt, dim=0).numpy()
-outfit_embeddings_gt = torch.cat(outfit_embeddings_gt, dim=0).numpy()
-
-def get_correct_count(outfit_embeddings, product_embeddings, top_k=5):
-    correct_count = 0
-
-    for i in tqdm(range(outfit_embeddings.shape[0])):
-
-        scores = []
-        for j in range(product_embeddings.shape[0]):
-            scores.append(distance.euclidean(outfit_embeddings[i], product_embeddings[j]))
-        sort_index = np.argsort(scores).tolist()
-        if i in sort_index[0:top_k]:
-            correct_count += 1
-    return correct_count
-
-def get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings, top_k=1):
-    correct_count = 0
-
-    for i in tqdm(range(outfit_embeddings.shape[0])):
-
-        scores_o = []
-        for j in range(product_embeddings.shape[0]):
-            scores_o.append(distance.euclidean(outfit_embeddings[i], product_embeddings[j]))
-        sort_index_o = np.argsort(scores_o).tolist()
-
-        scores_t = []
-        for j in range(product_embeddings.shape[0]):
-            scores_t.append(distance.euclidean(transfer_embeddings[i], product_embeddings[j]))
-        sort_index_t = np.argsort(scores_t).tolist()
-        correct_count += len(set(sort_index_o[0: top_k]).intersection(set(sort_index_t[0: top_k]))) / top_k
-    return correct_count
-
-# def build_tree(vectors, dim=64):
-#     a = AnnoyIndex(dim, 'euclidean')
-#     for i, v in enumerate(vectors):
-#         a.add_item(i, v)
-#     a.build(-1)
-#     return a
-#
-# product_tree = build_tree(product_embeddings)
-
-correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings, top_k=1)
-print("acc 1", correct_count, correct_count / dataset_size)
-correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, transfer_embeddings, top_k=5)
-print("acc 5", correct_count, correct_count / dataset_size)
-print("identity", total_length / dataset_size)
-
-correct_count_gt = get_correct_count(outfit_embeddings_gt, product_embeddings_gt, top_k=1)
-
-print("identity gt", total_length_gt / dataset_size)
-print("acc_gt", correct_count_gt , correct_count_gt / dataset_size)
-
-
-
-
+    visuals = [[transfer_1, output_1]]
+    tensors = tensor_list_for_board(visuals)
+    for b_i in range(transfer_1.shape[0]):
+        save_image(tensors[b_i], os.path.join(test_files_dir, str(i * opt.batch_size + b_i) + ".jpg"))

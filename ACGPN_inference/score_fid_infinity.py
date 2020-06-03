@@ -413,7 +413,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    root_path = "test_files_dir/resnet_mse_l1_14000/"
+    root_path = "test_files_dir/residual_resnet_mse_higher_identity_10000/"
     paths = ["refined"]
 
     data_m, data_s = compute_path_statistics("../../cp-vton/test_files_dir/GMM/gt", args.batch_size)

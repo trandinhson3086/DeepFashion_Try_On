@@ -12,8 +12,8 @@ from visualization import board_add_images
 import cv2
 import torch.nn as nn
 from resnet import Embedder
-from tryon_net import G
-from unet import VGGExtractor, Discriminator
+from tryon_net_gan import G, Discriminator
+from unet import VGGExtractor
 import torch.nn.init as init
 from tqdm import tqdm
 import torch.nn.functional as F

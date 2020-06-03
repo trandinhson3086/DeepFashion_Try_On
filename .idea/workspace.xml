@@ -2,7 +2,14 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_gan.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_gan.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet_pose.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet_pose.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,6 +41,35 @@
     <property name="WebServerToolWindowPanel.toolwindow.show.permissions" value="false" />
     <property name="WebServerToolWindowPanel.toolwindow.show.size" value="false" />
   </component>
+  <component name="RunManager">
+    <configuration name="create_different_test_Set" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="DeepFashion_Try_On" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/ACGPN_inference" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/ACGPN_inference/create_different_test_Set.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.create_different_test_Set" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="SvnConfiguration">
     <configuration />
   </component>
@@ -47,6 +83,7 @@
       <workItem from="1590305739385" duration="8913000" />
       <workItem from="1590363228523" duration="5339000" />
       <workItem from="1590386070024" duration="25725000" />
+      <workItem from="1590812588557" duration="44815000" />
     </task>
     <servers />
   </component>
@@ -58,6 +95,22 @@
       <screen x="0" y="23" width="2560" height="1417" />
     </state>
     <state x="862" y="307" key="#Deployment/0.23.2560.1417@0.23.2560.1417" timestamp="1590363412987" />
+    <state width="1033" height="332" key="GridCell.Tab.0.bottom" timestamp="1590860974782">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="1033" height="332" key="GridCell.Tab.0.bottom/0.23.2560.1417@0.23.2560.1417" timestamp="1590860974782" />
+    <state width="1033" height="332" key="GridCell.Tab.0.center" timestamp="1590860974781">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="1033" height="332" key="GridCell.Tab.0.center/0.23.2560.1417@0.23.2560.1417" timestamp="1590860974781" />
+    <state width="1033" height="332" key="GridCell.Tab.0.left" timestamp="1590860974781">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="1033" height="332" key="GridCell.Tab.0.left/0.23.2560.1417@0.23.2560.1417" timestamp="1590860974781" />
+    <state width="1033" height="332" key="GridCell.Tab.0.right" timestamp="1590860974782">
+      <screen x="0" y="23" width="2560" height="1417" />
+    </state>
+    <state width="1033" height="332" key="GridCell.Tab.0.right/0.23.2560.1417@0.23.2560.1417" timestamp="1590860974782" />
     <state x="1136" y="290" width="670" height="676" key="search.everywhere.popup" timestamp="1590548000331">
       <screen x="0" y="23" width="2560" height="1417" />
     </state>
@@ -73,5 +126,8 @@
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/DeepFashion_Try_On$create_different_test_Set.coverage" NAME="create_different_test_Set Coverage Results" MODIFIED="1590824606522" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ACGPN_inference" />
   </component>
 </project>

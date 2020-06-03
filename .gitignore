@@ -5,3 +5,4 @@ ACGPN_inference/checkpoints/label2city/latest_net_U.pth
 ACGPN_inference/checkpoints/label2city/latest_net_G2.pth
 Data_preprocessing/
 ACGPN_inference/test_files_dir
+ACGPN_inference/result_files_dir/
