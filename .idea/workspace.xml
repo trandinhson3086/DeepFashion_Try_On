@@ -2,14 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_gan.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_gan.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet_pose.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet_pose.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,7 +77,8 @@
       <workItem from="1590305739385" duration="8913000" />
       <workItem from="1590363228523" duration="5339000" />
       <workItem from="1590386070024" duration="25725000" />
-      <workItem from="1590812588557" duration="44815000" />
+      <workItem from="1590812588557" duration="46339000" />
+      <workItem from="1591160564575" duration="2886000" />
     </task>
     <servers />
   </component>
