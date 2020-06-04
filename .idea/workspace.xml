@@ -2,29 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/DeepFashion_Try_On.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/DeepFashion_Try_On.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/create_different_test_Set.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/grid_sample.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/produce_comparison_for_test.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/produce_comparison_residual_netl.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/produce_comparison_residual_net.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/produce_comparison_residual_pose.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/produce_user_study_images.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/produce_user_study_images.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/product_one_person_multiple_transfers.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/product_one_person_multiple_transfers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/resnet.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/identity_net.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_identity.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_identity_pose.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tps_grid_gen.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_dual_residual_resnet.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_adversarial_embedding.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_gan.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/train_residual_gan.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_identity_discriminator.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/train_residual_resnet_pose.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/ACGPN_inference/unet.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

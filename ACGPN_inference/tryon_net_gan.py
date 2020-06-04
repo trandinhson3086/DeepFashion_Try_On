@@ -249,35 +249,6 @@ class Decoder(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-class Warper(nn.Module):
-    def __init__(self, warp_num):
-        super(Warper, self).__init__()
-        self.warp_num = warp_num
-        self.model = list(models.resnet18(pretrained=True).children())[1:-1]
-        self.model.insert(0, nn.Conv2d(6, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False))
-        self.model = nn.Sequential(*self.model)
-        self.fc = nn.Linear(512, 6*warp_num)
-        self.fc.weight.data.zero_()
-        values = []
-        for i in [1, 0, 0, 0, 1, 0]:
-            for _ in range(warp_num):
-                values.append(i)
-        self.fc.bias.data.copy_(torch.tensor(values, dtype=torch.float))
-
-    def forward(self, input_mask, product):
-        input = torch.cat([input_mask, product], dim=1)
-        output = self.fc(self.model(input).view(input.size(0), -1))
-        affine_transform = output.view(-1, 2, 3, self.warp_num)
-
-        transforms = []
-        transformed_products = []
-
-        for i in range(self.warp_num):
-            transforms.append(affine_transform[:,:,:,i])
-            grid = F.affine_grid(affine_transform[:,:,:,i], product.size())
-            transformed_products.append(F.grid_sample(product, grid, padding_mode="border"))
-
-        return transforms, transformed_products
 
 class Discriminator(nn.Module):
     def __init__(self, ndf=64):
