@@ -10,7 +10,7 @@ import torch
 from torch.autograd import Variable
 import cv2
 import torch.nn as nn
-from resnet import Embedder
+from identity_net import Embedder
 from unet import UNet, VGGExtractor, Discriminator
 from tryon_net import G
 import torch.nn.init as init
@@ -175,7 +175,7 @@ def load_checkpoint(model, checkpoint_path):
 prev_model = create_model(opt)
 prev_model.cuda()
 
-model = G(input_dim=22)
+model = G()
 model.cuda()
 
 if not opt.checkpoint == '' and os.path.exists(opt.checkpoint):
@@ -225,8 +225,8 @@ for i, data in pbar:
         consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
         gt_residual = ((torch.mean(data['image'].cuda(), dim=1) - torch.mean(transfer_2, dim=1)).unsqueeze(1)) * consistent_mask
-        output_1 = model(transfer_1.detach(), torch.cat([gt_residual.detach(), data['pose'].cuda()], dim=1))
-        output_2 = model(transfer_2.detach(), torch.cat([gt_residual.detach(), data['pose'].cuda()], dim=1))
+        output_1 = model(transfer_1.detach(), gt_residual.detach())
+        output_2 = model(transfer_2.detach(), gt_residual.detach())
 
     ### display output images
     seg_label_1 = generate_label_color(generate_label_plain(input_label)).float().cuda()

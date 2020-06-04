@@ -10,7 +10,7 @@ import torch
 from torch.autograd import Variable
 import cv2
 import torch.nn as nn
-from resnet import Embedder
+from identity_net import Embedder
 from unet import UNet, VGGExtractor, Discriminator
 from tryon_net import G
 import torch.nn.init as init

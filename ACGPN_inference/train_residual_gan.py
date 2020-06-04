@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from visualization import board_add_images
 import cv2
 import torch.nn as nn
-from resnet import Embedder
+from identity_net import Embedder
 from tryon_net_gan import G, Discriminator
 from unet import VGGExtractor
 import torch.nn.init as init
