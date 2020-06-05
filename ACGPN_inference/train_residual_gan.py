@@ -267,20 +267,18 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             consistent_mask = (torch.abs(clothes_mask_2 - clothes_mask) < 0.1).float()
 
         gt = data['image'].cuda()
+        product_1 = data['color'].cuda()
+        product_2 = data['color2'].cuda()
+
         gt_residual = (((torch.mean(gt, dim=1) - torch.mean(transfer_1, dim=1)).unsqueeze(1)) * consistent_mask).detach()
         output_1 = model(transfer_1, gt_residual)
         output_2 = model(transfer_2, gt_residual)
 
-        embedding_1 = image_embedder(output_1)
-        embedding_2 = image_embedder(output_2)
-        embedding_1_t = image_embedder(transfer_1)
-        embedding_2_t = image_embedder(transfer_2)
-
         if opt.use_gan:
             # train discriminator
-            real_logit = discriminator(gt)
-            fake_logit_1 = discriminator(output_1.detach())
-            fake_logit_2 = discriminator(output_2.detach())
+            real_logit = discriminator(torch.cat([product_1, gt], 1))
+            fake_logit_1 = discriminator(torch.cat([product_1, output_1], 1).detach())
+            fake_logit_2 = discriminator(torch.cat([product_2, output_2], 1).detach())
 
             D_true_loss = adv_criterion(real_logit, True, True)
             D_fake_loss =  adv_criterion(torch.cat([fake_logit_1, fake_logit_2], 0), False, True)
@@ -291,13 +289,13 @@ for epoch in range(start_epoch, opt.niter + opt.niter_decay + 1):
             D_optim.step()
 
             # train generator
-            fake_logit_1 = discriminator(output_1)
-            fake_logit_2 = discriminator(output_2)
+            fake_logit_1 = discriminator(torch.cat([product_1, output_1], 1))
+            fake_logit_2 = discriminator(torch.cat([product_2, output_2], 1))
 
             G_adv_loss = adv_criterion(torch.cat([fake_logit_1, fake_logit_2], 0), True, False)
 
         # identity loss
-        identity_loss = mse_criterion(embedding_1, embedding_1_t) + mse_criterion(embedding_2, embedding_2_t)
+        identity_loss = torch_zeros_like(G_adv_loss)
 
         # vis reg loss
         output_1_feats = vgg_extractor(output_1)
