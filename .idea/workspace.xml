@@ -3,6 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="c6009204-0efd-46de-9811-774795ac15b7" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_fid_infinity.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/score_identity_residual.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ACGPN_inference/tryon_net_gan.py" beforeDir="false" afterPath="$PROJECT_DIR$/ACGPN_inference/tryon_net_gan.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

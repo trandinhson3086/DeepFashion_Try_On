@@ -319,6 +319,9 @@ correct_count = get_correct_match_count(outfit_embeddings, product_embeddings, t
 print("acc 5", correct_count, correct_count / dataset_size)
 print("identity", total_length / dataset_size)
 
+correct_count = get_correct_count(transfer_embeddings, product_embeddings, top_k=1)
+print("acc_transfer", correct_count , correct_count / dataset_size)
+
 correct_count_gt = get_correct_count(outfit_embeddings_gt, product_embeddings_gt, top_k=1)
 
 print("identity gt", total_length_gt / dataset_size)
